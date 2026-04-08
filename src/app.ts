@@ -4,6 +4,7 @@ import { load } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import type { JsonObject } from 'swagger-ui-express';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -14,8 +15,8 @@ app.use(express.json());
 
 // Swagger
 const swaggerDocument = load(
-  readFileSync(join(__dirname, '../swagger.yaml'), 'utf8')
-);
+  readFileSync(join(__dirname, '../swagger.yaml'), 'utf8'),
+) as JsonObject;
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.get('/health', (req, res) => {
