@@ -22,7 +22,7 @@ export default [
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        project: './tsconfig.json',
+        project: ['./tsconfig.json', './tsconfig.eslint.json'],
         tsconfigRootDir: import.meta.dirname,
       },
       globals: { ...globals.node },
@@ -64,7 +64,7 @@ export default [
     },
   },
   {
-    files: ['tests/**/*.js', '**/*.test.js'],
+    files: ['tests/**/*.ts', 'tests/**/*.js', '**/*.test.ts', '**/*.test.js'],
     languageOptions: {
       globals: {
         ...globals.jest,
