@@ -10,6 +10,22 @@ services:
         condition: service_healthy  # wait for DB to be ready
     restart: unless-stopped
 
+  caddy:
+    image: caddy:2-alpine
+    profiles: [production]
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN}
+    depends_on:
+      - app
+    restart: unless-stopped
+
   db:
     image: postgres:16-alpine
     environment:
@@ -26,3 +42,5 @@ services:
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:
