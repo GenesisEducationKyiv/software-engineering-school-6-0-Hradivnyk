@@ -4,6 +4,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
+COPY .husky/install.mjs ./.husky/install.mjs
 RUN npm ci
 
 COPY tsconfig.json ./
@@ -17,6 +18,7 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 COPY package*.json ./
+COPY .husky/install.mjs ./.husky/install.mjs
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
