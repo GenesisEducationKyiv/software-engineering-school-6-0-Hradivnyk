@@ -64,6 +64,12 @@ export default [
     },
   },
   {
+    files: ['.husky/**/*.mjs'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
+  {
     files: ['tests/**/*.ts', 'tests/**/*.js', '**/*.test.ts', '**/*.test.js'],
     languageOptions: {
       globals: {

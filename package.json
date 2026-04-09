@@ -20,7 +20,7 @@
     "test:unit": "jest --selectProjects unit",
     "test:integration": "jest --selectProjects integration",
     "test:coverage": "jest --coverage",
-    "prepare": "husky || true"
+    "prepare": "node .husky/install.mjs"
   },
   "lint-staged": {
     "src/**/*.ts": [
