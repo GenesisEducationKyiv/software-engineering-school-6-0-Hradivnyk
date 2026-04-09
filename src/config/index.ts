@@ -33,5 +33,6 @@ export const config = {
   },
   app: {
     baseUrl: optional('BASE_URL', 'http://localhost:3000'),
+    allowedOrigin: optional('ALLOWED_ORIGIN', '*'),
   },
 } as const;
