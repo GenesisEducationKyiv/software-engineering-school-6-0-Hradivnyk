@@ -12,6 +12,8 @@ import rateLimit from 'express-rate-limit';
 import logger from './utils/logger.js';
 import { pinoHttp } from 'pino-http';
 import { config } from './config/index.js';
+import subscriptionRoutes from './routes/subscriptionRoutes.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -46,5 +48,11 @@ const swaggerDocument = load(
   readFileSync(join(__dirname, '../swagger.yaml'), 'utf8'),
 ) as JsonObject;
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+app.use(express.urlencoded({ extended: false }));
+
+app.use('/api', subscriptionRoutes);
+
+app.use(errorHandler);
 
 export default app;
