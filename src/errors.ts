@@ -32,6 +32,12 @@ export class InvalidTokenError extends AppError {
   }
 }
 
+export class UnauthorizedError extends AppError {
+  constructor() {
+    super('Unauthorized', 401);
+  }
+}
+
 export class GitHubRateLimitError extends AppError {
   /** Unix timestamp (seconds) after which the rate limit resets. */
   constructor(public readonly resetAt: Date) {

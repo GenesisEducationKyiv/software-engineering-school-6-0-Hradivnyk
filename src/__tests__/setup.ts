@@ -4,3 +4,5 @@ process.env.SMTP_USER = 'test@example.com';
 process.env.SMTP_PASS = 'test-password';
 process.env.SMTP_FROM = 'noreply@example.com';
 process.env.NODE_ENV = 'test';
+process.env.API_KEY = '';
+process.env.API_KEY = 'test-api-key';

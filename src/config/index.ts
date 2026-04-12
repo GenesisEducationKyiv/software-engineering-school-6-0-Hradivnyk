@@ -38,4 +38,7 @@ export const config = {
   scanner: {
     cronSchedule: optional('SCANNER_CRON_SCHEDULE', '0 * * * *'),
   },
+  auth: {
+    apiKey: optional('API_KEY', ''),
+  },
 } as const;

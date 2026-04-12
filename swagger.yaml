@@ -11,6 +11,13 @@ tags:
 schemes:
   - "http"
   - "https"
+securityDefinitions:
+  ApiKeyAuth:
+    type: "apiKey"
+    in: "header"
+    name: "X-API-Key"
+security:
+  - ApiKeyAuth: []
 paths:
   /subscribe:
     post:
@@ -40,6 +47,8 @@ paths:
           description: "Subscription successful. Confirmation email sent."
         "400":
           description: "Invalid input (e.g., invalid repo format)"
+        "401":
+          description: "Missing or invalid API key"
         "404":
           description: "Repository not found on GitHub"
         "409":
@@ -64,6 +73,8 @@ paths:
           description: "Subscription confirmed successfully"
         "400":
           description: "Invalid token"
+        "401":
+          description: "Missing or invalid API key"
         "404":
           description: "Token not found"
   /unsubscribe/{token}:
@@ -86,6 +97,8 @@ paths:
           description: "Unsubscribed successfully"
         "400":
           description: "Invalid token"
+        "401":
+          description: "Missing or invalid API key"
         "404":
           description: "Token not found"
   /subscriptions:
@@ -112,6 +125,8 @@ paths:
               $ref: "#/definitions/Subscription"
         "400":
           description: "Invalid email"
+        "401":
+          description: "Missing or invalid API key"
 definitions:
   Subscription:
     type: "object"

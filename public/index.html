@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Release Subscriptions</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #222;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 48px 16px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 32px;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    h1 { font-size: 1.25rem; margin-bottom: 8px; }
+    p.subtitle { font-size: 0.875rem; color: #666; margin-bottom: 24px; }
+
+    label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px; }
+
+    input {
+      display: block;
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: #555; }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #222;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: #444; }
+    button:disabled { background: #aaa; cursor: default; }
+
+    .message {
+      margin-top: 16px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      display: none;
+    }
+    .message.success { background: #e6f4ea; color: #1e7e34; display: block; }
+    .message.error   { background: #fdecea; color: #c0392b; display: block; }
+
+    .hint {
+      font-size: 0.8rem;
+      color: #888;
+      margin-top: -12px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Subscribe to releases</h1>
+    <p class="subtitle">Get an email whenever a new GitHub release is published.</p>
+
+    <form id="subscribeForm">
+      <label for="email">Email</label>
+      <input id="email" type="email" placeholder="you@example.com" required />
+
+      <label for="repo">Repository</label>
+      <input id="repo" type="text" placeholder="owner/repo" required />
+      <p class="hint">e.g. golang/go or microsoft/vscode</p>
+
+      <button type="submit" id="submitBtn">Subscribe</button>
+    </form>
+
+    <div class="message" id="message"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById('subscribeForm');
+    const msg  = document.getElementById('message');
+    const btn  = document.getElementById('submitBtn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.className = 'message';
+      msg.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Subscribing…';
+
+      const email = document.getElementById('email').value.trim();
+      const repo  = document.getElementById('repo').value.trim();
+
+      try {
+        const res = await fetch('/api/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, repo }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+          msg.className = 'message success';
+          msg.textContent = data.message || 'Check your email to confirm the subscription.';
+          form.reset();
+        } else {
+          msg.className = 'message error';
+          msg.textContent = data.message || data.error || 'Something went wrong. Please try again.';
+        }
+      } catch {
+        msg.className = 'message error';
+        msg.textContent = 'Network error. Please check your connection.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Subscribe';
+      }
+    });
+  </script>
+</body>
+</html>
