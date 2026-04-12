@@ -15,8 +15,8 @@ export async function up(knex: Knex): Promise<void> {
       .references('repo')
       .inTable('repositories')
       .onDelete('CASCADE');
-    table.uuid('confirm_token').notNullable().unique();
-    table.uuid('unsubscribe_token').notNullable().unique();
+    table.text('confirm_token').notNullable().unique();
+    table.text('unsubscribe_token').notNullable().unique();
     table.text('status').notNullable().defaultTo('pending');
 
     table.unique(['email', 'repo']);

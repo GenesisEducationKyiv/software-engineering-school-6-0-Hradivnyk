@@ -28,9 +28,6 @@ export class EmailService {
         'To confirm your subscription, click the link below:',
         confirmUrl,
         '',
-        'To cancel this request and unsubscribe immediately, use this link:',
-        `${config.app.baseUrl}/api/unsubscribe/${token}`,
-        '',
         'If you did not make this request, ignore this email.',
       ].join('\n'),
     });

@@ -11,7 +11,7 @@ export const subscribeSchema = z.object({
 });
 
 export const tokenSchema = z.object({
-  token: z.uuid('Invalid token format'),
+  token: z.string().regex(/^[0-9a-f]{64}$/, 'Invalid token format'),
 });
 
 export const emailQuerySchema = z.object({
