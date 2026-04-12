@@ -10,7 +10,6 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY knexfile.ts ./
 COPY src ./src
-COPY migrations ./migrations
 
 RUN npm run build
 
@@ -24,7 +23,6 @@ COPY .husky/install.mjs ./.husky/install.mjs
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/migrations ./migrations
 COPY swagger.yaml ./
 COPY knexfile.ts ./
 COPY docker-entrypoint.sh ./

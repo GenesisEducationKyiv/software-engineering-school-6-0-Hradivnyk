@@ -3,7 +3,6 @@
   "include": [
     "src/**/*",
     "tests/**/*",
-    "migrations/**/*",
     "jest.config.ts",
     "*.config.ts",
     "knexfile.ts"
