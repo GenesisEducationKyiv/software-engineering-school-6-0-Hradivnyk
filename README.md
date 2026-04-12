@@ -2,6 +2,8 @@
 
 A service that watches GitHub repositories and notifies subscribers via email whenever a new release is published.
 
+**Live demo:** [releaseowl.stashohulia.dev](https://releaseowl.stashohulia.dev/)
+
 ## What It Does
 
 Users subscribe with their **email** and a GitHub **`owner/repo`** slug. The service:
