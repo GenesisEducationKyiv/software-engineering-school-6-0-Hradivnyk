@@ -40,7 +40,7 @@ export default [
       'no-throw-literal': 'off',
     
       // General rules
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: 'next' }],
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_|next' }],
       '@typescript-eslint/require-await': 'error',
       '@typescript-eslint/only-throw-error': 'error',
       '@typescript-eslint/explicit-function-return-type': 'warn',

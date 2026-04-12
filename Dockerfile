@@ -8,6 +8,7 @@ COPY .husky/install.mjs ./.husky/install.mjs
 RUN npm ci
 
 COPY tsconfig.json ./
+COPY knexfile.ts ./
 COPY src ./src
 
 RUN npm run build
@@ -23,9 +24,14 @@ RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
 COPY swagger.yaml ./
+COPY knexfile.ts ./
+COPY public ./public
+COPY docker-entrypoint.sh ./
+
+RUN chmod +x docker-entrypoint.sh
 
 ENV NODE_ENV=production
 
 EXPOSE 3000
 
-CMD ["node", "dist/index.js"]
+ENTRYPOINT ["sh", "docker-entrypoint.sh"]

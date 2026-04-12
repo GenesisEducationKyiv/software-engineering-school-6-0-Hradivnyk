@@ -4,7 +4,8 @@
     "src/**/*",
     "tests/**/*",
     "jest.config.ts",
-    "*.config.ts"
+    "*.config.ts",
+    "knexfile.ts"
   ],
   "exclude": [
     "node_modules",

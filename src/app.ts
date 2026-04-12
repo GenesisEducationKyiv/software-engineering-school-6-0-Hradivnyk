@@ -2,8 +2,7 @@ import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 import { load } from 'js-yaml';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { resolve } from 'node:path';
 import type { JsonObject } from 'swagger-ui-express';
 
 import helmet from 'helmet';
@@ -12,11 +11,13 @@ import rateLimit from 'express-rate-limit';
 import logger from './utils/logger.js';
 import { pinoHttp } from 'pino-http';
 import { config } from './config/index.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import subscriptionRoutes from './routes/subscriptionRoutes.js';
+import { errorHandler } from './middleware/errorHandler.js';
+import { apiKeyAuth } from './middleware/apiKeyAuth.js';
 
 const app = express();
+
+app.use(express.static(resolve(process.cwd(), 'public')));
 
 app.use(helmet());
 
@@ -43,8 +44,14 @@ app.use(express.json());
 
 // Swagger
 const swaggerDocument = load(
-  readFileSync(join(__dirname, '../swagger.yaml'), 'utf8'),
+  readFileSync(resolve(process.cwd(), 'swagger.yaml'), 'utf8'),
 ) as JsonObject;
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+app.use(express.urlencoded({ extended: false }));
+
+app.use('/api', apiKeyAuth, subscriptionRoutes);
+
+app.use(errorHandler);
 
 export default app;
