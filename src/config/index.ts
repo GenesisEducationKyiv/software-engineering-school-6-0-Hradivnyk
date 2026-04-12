@@ -35,4 +35,7 @@ export const config = {
     baseUrl: optional('BASE_URL', 'http://localhost:3000'),
     allowedOrigin: optional('ALLOWED_ORIGIN', '*'),
   },
+  scanner: {
+    cronSchedule: optional('SCANNER_CRON_SCHEDULE', '0 * * * *'),
+  },
 } as const;

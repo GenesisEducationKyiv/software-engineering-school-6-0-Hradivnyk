@@ -7,6 +7,13 @@ interface SubscriptionRow {
   last_seen_tag: string | null;
 }
 
+export interface ConfirmedSubscriptionWithToken {
+  email: string;
+  repo: string;
+  unsubscribe_token: string;
+  last_seen_tag: string | null;
+}
+
 export class SubscriptionModel {
   // Upserts the repository and inserts a new pending subscription with both tokens.
   async create(
@@ -45,6 +52,26 @@ export class SubscriptionModel {
       .where({ unsubscribe_token: unsubscribeToken })
       .delete();
     return count > 0;
+  }
+
+  // Returns all confirmed subscriptions with their unsubscribe tokens and last seen tag.
+  async findAllConfirmedWithTokens(): Promise<
+    ConfirmedSubscriptionWithToken[]
+  > {
+    return knex('subscriptions')
+      .join('repositories', 'subscriptions.repo', 'repositories.repo')
+      .where('subscriptions.status', 'confirmed')
+      .select(
+        'subscriptions.email',
+        'subscriptions.repo',
+        'subscriptions.unsubscribe_token',
+        'repositories.last_seen_tag',
+      );
+  }
+
+  // Updates last_seen_tag for the given repository.
+  async updateLastSeenTag(repo: string, tag: string): Promise<void> {
+    await knex('repositories').where({ repo }).update({ last_seen_tag: tag });
   }
 
   // Returns all confirmed subscriptions for the given email, including last seen release tag.
