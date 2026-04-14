@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { subscriptionController } from '../controllers/subscriptionController.js';
+import { apiKeyAuth } from '../middleware/apiKeyAuth.js';
 
 const router = Router();
 
-router.post('/subscribe', (req, res, next) =>
+router.post('/subscribe', apiKeyAuth, (req, res, next) =>
   subscriptionController.subscribe(req, res, next),
 );
 

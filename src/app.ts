@@ -13,7 +13,6 @@ import { pinoHttp } from 'pino-http';
 import { config } from './config/index.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
-import { apiKeyAuth } from './middleware/apiKeyAuth.js';
 
 const app = express();
 
@@ -50,7 +49,7 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use(express.urlencoded({ extended: false }));
 
-app.use('/api', apiKeyAuth, subscriptionRoutes);
+app.use('/api', subscriptionRoutes);
 
 app.use(errorHandler);
 
