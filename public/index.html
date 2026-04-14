@@ -77,6 +77,9 @@
       <label for="email">Email</label>
       <input id="email" type="email" placeholder="you@example.com" required />
 
+      <label for="apiKey">API Key</label>
+      <input id="apiKey" type="text" placeholder="X-API-Key" />
+
       <button type="submit">Subscribe</button>
     </form>
 
@@ -91,9 +94,13 @@
       msg.className = '';
 
       try {
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKey) headers['X-API-Key'] = apiKey;
+
         const res = await fetch('/api/subscribe', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             repo:  document.getElementById('repo').value.trim(),
             email: document.getElementById('email').value.trim(),
