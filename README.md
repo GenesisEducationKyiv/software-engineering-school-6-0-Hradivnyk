@@ -2,7 +2,7 @@
 
 A service that watches GitHub repositories and notifies subscribers via email whenever a new release is published.
 
-**Live demo:** [releaseowl.stashohulia.dev](https://releaseowl.stashohulia.dev/)
+**Live demo:** [releaseowl.stashohulia.dev](https://releaseowl.stashohulia.dev/) — API Key: `a3f8c2e1d4b7a9f0e5c8d2b1a6f3e9c4d7b0a2e5f8c1d4b7a0e3f6c9d2b5a8`
 
 ## What It Does
 
