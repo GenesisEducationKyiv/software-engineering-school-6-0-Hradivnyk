@@ -8,7 +8,4 @@ coverage/
 *.test.ts
 tests/
 *.md
-.prettierrc
-eslint.config.js
 jest.config.cjs
-tsconfig.eslint.json
