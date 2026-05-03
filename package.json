@@ -23,7 +23,8 @@
     "migrate": "tsx src/migrate.ts",
     "migrate:rollback": "node --import tsx/esm node_modules/.bin/knex --knexfile knexfile.ts migrate:rollback",
     "migrate:make": "node --import tsx/esm node_modules/.bin/knex --knexfile knexfile.ts migrate:make",
-    "lint": "eslint src",
+    "typecheck": "tsc --noEmit -p tsconfig.eslint.json",
+    "lint": "eslint src --max-warnings 0",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write src",
     "format:check": "prettier --check src",
@@ -35,7 +36,7 @@
   },
   "lint-staged": {
     "src/**/*.ts": [
-      "eslint --fix",
+      "eslint --fix --max-warnings 0",
       "prettier --write"
     ]
   },
@@ -51,12 +52,9 @@
     "@types/pino-http": "^5.8.4",
     "@types/supertest": "^7.2.0",
     "@types/swagger-ui-express": "^4.1.8",
-    "@typescript-eslint/eslint-plugin": "^8.58.1",
-    "@typescript-eslint/parser": "^8.58.1",
     "eslint": "^10.2.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-n": "^17.24.0",
-    "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-security": "^4.0.0",
     "globals": "^17.4.0",
     "husky": "^9.1.7",
@@ -67,6 +65,7 @@
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.9",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.59.1"
   }
 }

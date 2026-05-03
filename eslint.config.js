@@ -1,85 +1,85 @@
+import tseslint from 'typescript-eslint';
 import js from '@eslint/js';
-import tsPlugin from '@typescript-eslint/eslint-plugin';
-import tsParser from '@typescript-eslint/parser';
-import prettierPlugin from 'eslint-plugin-prettier';
 import prettierConfig from 'eslint-config-prettier';
 import nodePlugin from 'eslint-plugin-n';
 import securityPlugin from 'eslint-plugin-security';
 import globals from 'globals';
 
-export default [
+export default tseslint.config(
+  // only linting our own code, not what the build tools have generated.
+  { ignores: ['dist/**', 'coverage/**'] },
+
   js.configs.recommended,
-  prettierConfig,
+
   {
     files: ['**/*.ts'],
+    // `tseslint.configs.recommended` is the flat-config-native way to apply @typescript-eslint rules
+    extends: tseslint.configs.recommended,
     plugins: {
-      '@typescript-eslint': tsPlugin,
-      prettier: prettierPlugin,
-      node: nodePlugin,
+      n: nodePlugin,
       security: securityPlugin,
     },
-
     languageOptions: {
-      parser: tsParser,
       parserOptions: {
+        // gives ESLint access to TypeScript types so that it can perform a deep analysis
+        // of the code, rather than just a syntactic one
         project: ['./tsconfig.json', './tsconfig.eslint.json'],
         tsconfigRootDir: import.meta.dirname,
       },
       globals: { ...globals.node },
     },
-
     rules: {
-      ...tsPlugin.configs.recommended.rules,
-    
-      // Prettier
-      'prettier/prettier': 'error',
-    
-      // Disable basic rules in favor of TypeScript versions
+      // Disable base rules in favour of TypeScript versions
       'no-unused-vars': 'off',
       'require-await': 'off',
       'no-throw-literal': 'off',
-    
-      // General rules
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_|next' }],
+
+      // Prohibits declaring variables or arguments that are not used anywhere.
+      // But it ignores arguments that start with _
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/require-await': 'error',
       '@typescript-eslint/only-throw-error': 'error',
       '@typescript-eslint/explicit-function-return-type': 'warn',
-    
-      // General rules that don't have TS versions
+
       'no-console': 'warn',
       'no-var': 'error',
       'prefer-const': 'error',
-      'eqeqeq': ['error', 'always'],
+      eqeqeq: ['error', 'always'],
       'no-async-promise-executor': 'error',
-      'no-await-in-loop': 'warn',
-    
-      // Node.js
-      'node/no-deprecated-api': 'error',
-      'node/no-missing-import': 'off',
-    
-      // Security
+      // Prohibits the use of `await` inside loops.
+      'no-await-in-loop': 'error',
+
+      'n/no-deprecated-api': 'error',
+      // checks whether the modules you are importing exist.
+      'n/no-missing-import': 'off',
+
       'security/detect-non-literal-regexp': 'warn',
       'security/detect-non-literal-fs-filename': 'warn',
       'security/detect-eval-with-expression': 'error',
     },
   },
+
   {
     files: ['.husky/**/*.mjs'],
     languageOptions: {
       globals: { ...globals.node },
     },
   },
+
   {
     files: ['tests/**/*.ts', 'tests/**/*.js', '**/*.test.ts', '**/*.test.js'],
     languageOptions: {
-      globals: {
-        ...globals.jest,
-      },
+      globals: { ...globals.jest },
     },
     rules: {
       'no-console': 'off',
-      'node/no-missing-import': 'off',
+      'n/no-missing-import': 'off',
       'security/detect-object-injection': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
     },
   },
-];
+
+  // prettierConfig at the end ensures that ESLint won't conflict with prettier
+  // over indentation, quotes, semicolons, and so on.
+  prettierConfig,
+);
