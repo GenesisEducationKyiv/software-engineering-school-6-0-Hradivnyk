@@ -33,7 +33,6 @@ export class ScannerService {
 
     for (const [repo, subscribers] of byRepo) {
       try {
-        // eslint-disable-next-line no-await-in-loop
         const release = await githubService.getLatestRelease(repo);
 
         if (!release) {
@@ -56,7 +55,6 @@ export class ScannerService {
           'Scanner: new release detected, sending notifications',
         );
 
-        // eslint-disable-next-line no-await-in-loop
         await Promise.allSettled(
           subscribers.map((sub) =>
             emailService
@@ -75,7 +73,6 @@ export class ScannerService {
           ),
         );
 
-        // eslint-disable-next-line no-await-in-loop
         await subscriptionModel.updateLastSeenTag(repo, release.tag_name);
       } catch (err) {
         logger.error({ err, repo }, 'Scanner: error processing repo');
