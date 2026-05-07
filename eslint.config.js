@@ -13,8 +13,7 @@ export default tseslint.config(
 
   {
     files: ['**/*.ts'],
-    // `tseslint.configs.recommended` is the flat-config-native way to apply @typescript-eslint rules
-    extends: tseslint.configs.recommended,
+    extends: tseslint.configs.recommendedTypeChecked,
     plugins: {
       n: nodePlugin,
       security: securityPlugin,
@@ -36,10 +35,12 @@ export default tseslint.config(
 
       // Prohibits declaring variables or arguments that are not used anywhere.
       // But it ignores arguments that start with _
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      '@typescript-eslint/require-await': 'error',
-      '@typescript-eslint/only-throw-error': 'error',
-      '@typescript-eslint/explicit-function-return-type': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_' },
+      ],
+      '@typescript-eslint/explicit-function-return-type': 'error',
+      '@typescript-eslint/promise-function-async': 'error',
 
       'no-console': 'warn',
       'no-var': 'error',

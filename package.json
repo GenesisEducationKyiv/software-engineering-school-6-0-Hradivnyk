@@ -24,10 +24,10 @@
     "migrate:rollback": "node --import tsx/esm node_modules/.bin/knex --knexfile knexfile.ts migrate:rollback",
     "migrate:make": "node --import tsx/esm node_modules/.bin/knex --knexfile knexfile.ts migrate:make",
     "typecheck": "tsc --noEmit -p tsconfig.eslint.json",
-    "lint": "eslint src --max-warnings 0",
-    "lint:fix": "eslint src --fix",
-    "format": "prettier --write src",
-    "format:check": "prettier --check src",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "jest",
     "test:unit": "jest --selectProjects unit",
     "test:integration": "jest --selectProjects integration",
@@ -35,7 +35,7 @@
     "prepare": "node .husky/install.mjs"
   },
   "lint-staged": {
-    "src/**/*.ts": [
+    "**/*.{ts,js,cjs,mjs}": [
       "eslint --fix --max-warnings 0",
       "prettier --write"
     ]
