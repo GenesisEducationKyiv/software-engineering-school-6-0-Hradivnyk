@@ -77,6 +77,11 @@ export default tseslint.config(
       'n/no-missing-import': 'off',
       'security/detect-object-injection': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
+      // Jest mock patterns (e.g. expect(mock).toHaveBeenCalledWith, mock.calls[0])
+      // routinely trigger these rules; disabling them in tests avoids noisy false positives.
+      '@typescript-eslint/unbound-method': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
     },
   },
 
