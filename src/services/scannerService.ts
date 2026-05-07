@@ -47,7 +47,7 @@ export class ScannerService {
       );
 
       await Promise.allSettled(
-        subscribers.map((sub) =>
+        subscribers.map(async (sub) =>
           emailService
             .sendNotificationEmail(
               sub.email,
@@ -82,11 +82,10 @@ export class ScannerService {
 
     const byRepo = groupByRepo(subscriptions);
 
-    await Promise.allSettled(
-      Array.from(byRepo.entries()).map(([repo, subscribers]) =>
-        this.processRepo(repo, subscribers),
-      ),
-    );
+    for (const [repo, subscribers] of byRepo.entries()) {
+      // eslint-disable-next-line no-await-in-loop
+      await this.processRepo(repo, subscribers); // sequential to respect GitHub API rate limits
+    }
 
     logger.info('Scanner: release check complete');
   }
