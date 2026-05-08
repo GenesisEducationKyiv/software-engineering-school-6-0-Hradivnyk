@@ -1,135 +1,132 @@
 # System Design: Release Owl
 
-## Зміст
+## Table of Contents
 
-1. [Огляд системи](#1-огляд-системи)
-2. [Вимоги системи](#2-вимоги-системи)
-3. [Обмеження](#3-обмеження)
-4. [Оцінка навантаження](#4-оцінка-навантаження)
-5. [High-level архітектура](#5-high-level-архітектура)
-6. [Детальний дизайн компонентів](#6-детальний-дизайн-компонентів)
-7. [Модель даних](#7-модель-даних)
+1. [System Overview](#1-system-overview)
+2. [System Requirements](#2-system-requirements)
+3. [Constraints](#3-constraints)
+4. [Load Estimation](#4-load-estimation)
+5. [High-Level Architecture](#5-high-level-architecture)
+6. [Detailed Component Design](#6-detailed-component-design)
+7. [Data Model](#7-data-model)
 8. [API Integration](#8-api-integration)
-9. [Безпека](#9-безпека)
-10. [Спостережуваність](#10-спостережуваність)
-11. [Деплоймент](#11-деплоймент)
+9. [Future Work](#9-future-work)
 
 ---
 
-## 1. Огляд системи
+## 1. System Overview
 
-**Release Owl** — HTTP-сервіс, що дозволяє користувачам підписуватися на email-сповіщення про нові релізи GitHub-репозиторіїв. Сервіс регулярно опитує GitHub API та надсилає листи підписникам при виявленні нового тегу релізу.
+**Release Owl** is an HTTP service that allows users to subscribe to email notifications about new releases of GitHub repositories. The service periodically polls the GitHub API and sends emails to subscribers when a new release tag is detected.
 
 ```
-Користувач → POST /api/subscribe
-                    ↓
-           Валідація репо (GitHub API)
-                    ↓
-           Збереження у PostgreSQL
-                    ↓
-           Відправка confirmation email
-                    ↓
-           Користувач підтверджує підписку
-                    ↓
-[cron] Сканер → GitHub API → новий реліз? → Email-сповіщення всім підписникам
+User → POST /api/subscribe
+                ↓
+       Repository validation (GitHub API)
+                ↓
+       Persist to PostgreSQL
+                ↓
+       Send confirmation email
+                ↓
+       User confirms subscription
+                ↓
+[cron] Scanner → GitHub API → new release? → Email notification to all subscribers
 ```
 
 ---
 
-## 2. Вимоги системи
+## 2. System Requirements
 
-### 2.1 Функціональні вимоги
+### 2.1 Functional Requirements
 
-| # | Вимога |
-|---|--------|
-| F-01 | Користувач може підписатися на сповіщення, вказавши email та `owner/repo` slug |
-| F-02 | Система перевіряє існування репозиторію через GitHub REST API перед збереженням підписки |
-| F-03 | Підписка активується лише після підтвердження email (double opt-in) |
-| F-04 | Система надсилає email з посиланням для підтвердження після реєстрації підписки |
-| F-05 | Система надсилає email-сповіщення всім підтвердженим підписникам при виявленні нового релізу |
-| F-06 | Кожен лист сповіщення містить unsubscribe-посилання з одноразовим токеном |
-| F-07 | Користувач може відписатися у будь-який момент, перейшовши за унікальним посиланням |
-| F-08 | Система надає API для перегляду всіх активних підписок для конкретного email |
-| F-09 | Пара `(email, repo)` унікальна — повторна підписка повертає 409 |
-| F-10 | Статична landing page дозволяє підписатися без використання API напряму |
-| F-11 | Swagger UI доступний за `/api/docs` для інтерактивного тестування API |
+| # | Requirement |
+|---|-------------|
+| F-01 | A user can subscribe to notifications by providing an email and an `owner/repo` slug |
+| F-02 | The system validates repository existence via the GitHub REST API before persisting the subscription |
+| F-03 | A subscription is activated only after email confirmation (double opt-in) |
+| F-04 | The system sends a confirmation email with a verification link after a subscription is registered |
+| F-05 | The system sends email notifications to all confirmed subscribers when a new release is detected |
+| F-06 | Every notification email contains an unsubscribe link with a one-time token |
+| F-07 | A user can unsubscribe at any time by following their unique unsubscribe link |
+| F-08 | The system exposes an API to list all active subscriptions for a given email |
+| F-09 | The `(email, repo)` pair is unique — a duplicate subscription returns 409 |
+| F-10 | A static landing page allows subscribing without calling the API directly |
+| F-11 | Swagger UI is available at `/api/docs` for interactive API testing |
 
-### 2.2 Нефункціональні вимоги
+### 2.2 Non-Functional Requirements
 
-| Категорія | Вимога | Ціль |
-|-----------|--------|------|
-| **Доступність** | Uptime сервісу | ≥ 99% (single-instance EC2) |
-| **Затримка** | P95 відповідь на API-запити | < 500 ms (без урахування GitHub API) |
-| **Масштабованість** | Кількість репозиторіїв, що моніторяться | До 1 000 без зміни архітектури |
-| **Надійність** | Помилка надсилання одного листа | Не зупиняє обробку решти підписників (`Promise.allSettled`) |
-| **Надійність** | Crash сканера | Не впливає на обробку HTTP-запитів (graceful logging) |
-| **Безпека** | Захист від brute-force | Rate limiting: 100 req / 15 хв / IP |
-| **Безпека** | Захист API-ендпоінтів | Опціональний `X-API-Key` з timing-safe порівнянням |
-| **Безпека** | Транспорт | TLS через Caddy (Let's Encrypt) у production |
-| **Конфігурованість** | Запуск без ключових env-змінних | Fail-fast при старті |
-| **Підтримуваність** | Структурований JSON-logging | Pino, рівень DEBUG/INFO/ERROR |
-| **Тестованість** | Покриття unit + integration тестами | Jest + Supertest |
-
----
-
-## 3. Обмеження
-
-### Технічні обмеження
-
-- **GitHub API rate limit без токена:** 60 запитів/год на IP. При N унікальних репозиторіях та годинному крон-розкладі система може обробити максимум 60 репо без `GITHUB_TOKEN`. З токеном — 5 000 запитів/год.
-- **In-process scheduler:** `node-cron` виконується в тому ж Event Loop, що й HTTP-сервер. Тривалий scan-цикл може затримати обробку HTTP-запитів при великій кількості репозиторіїв.
-- **Немає retry-механізму** для emails та GitHub-запитів: тимчасові помилки SMTP або GitHub API призводять до пропуску сповіщення до наступного cron-тіку.
-- **Відсутність горизонтального масштабування:** один процес + один DB-інстанс. Кілька запущених екземплярів призведуть до дублювання сповіщень.
-
-### Бізнес-обмеження
-
-- Сервіс моніторить лише **публічні GitHub-репозиторії** (без OAuth для private repos).
-- Відстежуються лише **офіційні релізи** GitHub (`/releases/latest`), не теги та не pre-release.
-- Для кожної пари `(email, repo)` підтримується лише **одна активна підписка**.
-
-### Інфраструктурні обмеження
-
-- Деплой на **одному EC2-інстансі** (без load balancer, без auto-scaling).
-- База даних — **single-node PostgreSQL** без реплік та резервного копіювання за межами Docker volume.
+| Category | Requirement | Target |
+|----------|-------------|--------|
+| **Availability** | Service uptime | ≥ 99% (single-instance EC2) |
+| **Latency** | P95 response time for API requests | < 500 ms (excluding GitHub API latency) |
+| **Scalability** | Number of monitored repositories | Up to 1,000 without architectural changes |
+| **Reliability** | Single email send failure | Does not stop processing other subscribers (`Promise.allSettled`) |
+| **Reliability** | Scanner crash | Does not affect HTTP request handling (graceful logging) |
+| **Security** | Brute-force protection | Rate limiting: 100 req / 15 min / IP |
+| **Security** | API endpoint protection | Optional `X-API-Key` with timing-safe comparison |
+| **Security** | Transport | TLS via Caddy (Let's Encrypt) in production |
+| **Configurability** | Start without required env variables | Fail-fast on startup |
+| **Maintainability** | Structured JSON logging | Pino, DEBUG/INFO/ERROR levels |
+| **Testability** | Unit + integration test coverage | Jest + Supertest |
 
 ---
 
-## 4. Оцінка навантаження
+## 3. Constraints
 
-### 4.1 Користувачі та трафік
+### Technical Constraints
 
-| Метрика | Оцінка | Примітка |
-|---------|--------|---------|
-| Активних підписників | ~1 000 | Цільова аудиторія MVP |
-| Унікальних репозиторіїв | ~300 | Частина підписників підписана на одне й те саме репо |
-| Нових підписок / день | ~20 | `POST /api/subscribe` |
-| Підтверджень / день | ~18 | ~90% конверсія |
-| Перегляд підписок / день | ~10 | `GET /api/subscriptions` |
-| GitHub API запитів / год | ~300 | 1 запит × 300 репо × 1 раз/год |
-| Email-сповіщень / год | ~50 | При ~5% репо що мають новий реліз за годину |
+- **GitHub API rate limit without a token:** 60 requests/hour per IP. With N unique repositories on an hourly cron schedule, the system can process at most 60 repos without `GITHUB_TOKEN`. With a token — 5,000 requests/hour.
+- **In-process scheduler:** `node-cron` runs in the same Event Loop as the HTTP server. A long scan cycle can delay HTTP request handling with a large number of repositories.
+- **No retry mechanism** for emails or GitHub requests: transient SMTP or GitHub API failures result in a missed notification until the next cron tick.
+- **No horizontal scaling:** single process + single DB instance. Running multiple instances will cause duplicate notifications (see [future work](#duplicate-notifications-under-horizontal-scaling)).
 
+### Business Constraints
 
-### 4.2 Дані
+- The service monitors only **public GitHub repositories** (no OAuth for private repos).
+- Only **official GitHub releases** (`/releases/latest`) are tracked — not tags or pre-releases.
+- Only **one active subscription** per `(email, repo)` pair is supported.
 
-| Таблиця | Розмір рядка (estimate) | Рядків | Обсяг |
-|---------|------------------------|--------|-------|
-| `repositories` | ~100 байт | 300 | ~30 KB |
-| `subscriptions` | ~300 байт | 1 000 | ~300 KB |
+### Infrastructure Constraints
 
-**Зростання:** +20 підписок / день = 6 KB / день → **2 MB / рік**. Порогові значення для PostgreSQL не є проблемою за будь-якого реалістичного обсягу.
+- Deployed on a **single EC2 instance** (no load balancer, no auto-scaling).
+- Database — **single-node PostgreSQL** with no replicas and no backup beyond the Docker volume.
+
+---
+
+## 4. Load Estimation
+
+### 4.1 Users and Traffic
+
+| Metric | Estimate | Note |
+|--------|----------|------|
+| Active subscribers | ~1,000 | MVP target audience |
+| Unique repositories | ~300 | Some subscribers follow the same repo |
+| New subscriptions / day | ~20 | `POST /api/subscribe` |
+| Confirmations / day | ~18 | ~90% conversion rate |
+| Subscription lookups / day | ~10 | `GET /api/subscriptions` |
+| GitHub API requests / hour | ~300 | 1 request × 300 repos × 1 time/hour |
+| Email notifications / hour | ~50 | ~5% of repos having a new release per hour |
+
+### 4.2 Data
+
+| Table | Row size (estimate) | Rows | Volume |
+|-------|---------------------|------|--------|
+| `repositories` | ~100 bytes | 300 | ~30 KB |
+| `subscriptions` | ~300 bytes | 1,000 | ~300 KB |
+
+**Growth:** +20 subscriptions/day = 6 KB/day → **2 MB/year**. PostgreSQL thresholds are not a concern at any realistic volume.
 
 ### 4.3 Bandwidth
 
-| Напрямок | Оцінка | Розрахунок |
-|----------|--------|-----------|
-| Вхідний HTTP-трафік | ~5 KB/год | ~20 req × ~250 байт/req |
-| Вихідний до GitHub API | ~90 KB/год | 300 req × ~300 байт response |
-| Вихідні email-сповіщення | ~50 KB/год | 50 листів × ~1 KB/лист |
-| **Разом** | **< 200 KB/год** | Не є вузьким місцем |
+| Direction | Estimate | Calculation |
+|-----------|----------|-------------|
+| Inbound HTTP traffic | ~5 KB/hour | ~20 req × ~250 bytes/req |
+| Outbound to GitHub API | ~90 KB/hour | 300 req × ~300 bytes response |
+| Outbound email notifications | ~50 KB/hour | 50 emails × ~1 KB/email |
+| **Total** | **< 200 KB/hour** | Not a bottleneck |
 
 ---
 
-## 5. High-level архітектура
+## 5. High-Level Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -167,7 +164,7 @@
    api.github.com                (Resend/Gmail/etc.)
 ```
 
-### Потік підписки (Happy Path)
+### Subscription Flow (Happy Path)
 
 ```
 Client          Express         subscriptionService    GitHub API      SMTP
@@ -193,101 +190,79 @@ Client          Express         subscriptionService    GitHub API      SMTP
   │◄───────────────│ 200 OK             │                   │            │
 ```
 
-### Потік сканування
-
-```
-node-cron         scannerService      DB             GitHub API      SMTP
-    │                   │              │                  │             │
-    │ (cron tick)       │              │                  │             │
-    │──────────────────►│              │                  │             │
-    │                   │ findAllConfirmed                │             │
-    │                   │─────────────►│                  │             │
-    │                   │◄─────────────│                  │             │
-    │                   │              │                  │             │
-    │                   │ [for each repo]                 │             │
-    │                   │ getLatestRelease(repo)          │             │
-    │                   │─────────────────────────────►  │             │
-    │                   │◄─────────────────────────────  │             │
-    │                   │              │                  │             │
-    │                   │ [if new tag] sendNotificationEmail            │
-    │                   │──────────────────────────────────────────────►
-    │                   │ updateLastSeenTag               │             │
-    │                   │─────────────►│                  │             │
-```
-
 ---
 
-## 6. Детальний дизайн компонентів
+## 6. Detailed Component Design
 
 ### 6.1 HTTP Server (Express 5)
 
-**Middleware pipeline** (в порядку виконання):
+**Middleware pipeline** (in execution order):
 
 ```
-express.static(public/)        → статична landing page
+express.static(public/)        → static landing page
 helmet()                        → security headers
 cors({ origin, methods })       → CORS allowlist
-rateLimit(100/15хв/IP)          → захист від brute-force
+rateLimit(100/15min/IP)         → brute-force protection
 pinoHttp()                      → structured request logging
 express.json()                  → JSON body parsing
 express.urlencoded()            → form body parsing
-swagger-ui (/api/docs)          → OpenAPI документація
-subscriptionRoutes (/api)       → бізнес-ендпоінти
-errorHandler()                  → централізована обробка помилок
+swagger-ui (/api/docs)          → OpenAPI documentation
+subscriptionRoutes (/api)       → business endpoints
+errorHandler()                  → centralized error handling
 ```
 
 **Error handling:**
 
-- `ZodError` → 400 Bad Request з деталями валідації
-- `AppError` (кастомні: `RepositoryNotFoundError`, `DuplicateSubscriptionError`, `InvalidTokenError`, `TokenNotFoundError`) → відповідні HTTP статус-коди
-- Несподівані помилки → 500 Internal Server Error (без витоку деталей стека)
+- `ZodError` → 400 Bad Request with validation details
+- `AppError` (custom: `RepositoryNotFoundError`, `DuplicateSubscriptionError`, `InvalidTokenError`, `TokenNotFoundError`) → corresponding HTTP status codes
+- Unexpected errors → 500 Internal Server Error (no stack trace leaked)
 
 ### 6.2 Subscription Service
 
-Координує повний lifecycle підписки:
+Coordinates the full subscription lifecycle:
 
-| Метод | Дія |
-|-------|-----|
-| `subscribe(email, repo)` | Перевіряє репо → перевіряє дублікат → генерує токени (`crypto.randomBytes(32)`) → зберігає → надсилає confirmation email |
-| `confirm(token)` | Валідує формат токена (hex 64) → оновлює статус на `confirmed` |
-| `unsubscribe(token)` | Валідує формат → видаляє рядок підписки |
-| `getSubscriptions(email)` | Повертає всі підписки для email |
+| Method | Action |
+|--------|--------|
+| `subscribe(email, repo)` | Validates repo → checks for duplicate → generates tokens (`crypto.randomBytes(32)`) → persists → sends confirmation email |
+| `confirm(token)` | Validates token format (hex 64) → updates status to `confirmed` |
+| `unsubscribe(token)` | Validates format → deletes the subscription row |
+| `getSubscriptions(email)` | Returns all subscriptions for the given email |
 
 ### 6.3 Scanner Service
 
-Cron-задача з налаштованим розкладом (`SCANNER_CRON_SCHEDULE`, default: `0 * * * *`):
+Cron job with a configurable schedule (`SCANNER_CRON_SCHEDULE`, default: `0 * * * *`):
 
-1. Завантажує всі `confirmed` підписки з `last_seen_tag` одним запитом
-2. Групує підписки по `repo` → 1 GitHub API call на репозиторій незалежно від кількості підписників
-3. Порівнює `release.tag_name` з `last_seen_tag`
-4. При новому релізі: надсилає email всім підписникам через `Promise.allSettled` (один збій не зупиняє решту)
-5. Оновлює `last_seen_tag` в таблиці `repositories`
+1. Loads all `confirmed` subscriptions with `last_seen_tag` in a single query
+2. Groups subscriptions by `repo` → 1 GitHub API call per repository regardless of subscriber count
+3. Compares `release.tag_name` against `last_seen_tag`
+4. On a new release: sends email to all subscribers via `Promise.allSettled` (one failure does not stop the rest)
+5. Updates `last_seen_tag` in the `repositories` table
 
-**Важлива деталь:** використання `Promise.allSettled` замість `Promise.all` гарантує, що помилка SMTP для одного підписника не перерве сповіщення інших.
+**Key detail:** using `Promise.allSettled` instead of `Promise.all` ensures that an SMTP failure for one subscriber does not interrupt notifications to others.
 
 ### 6.4 GitHub Service
 
-Тонкий wrapper навколо GitHub REST API v2022-11-28:
+Thin wrapper around GitHub REST API v2022-11-28:
 
-| Метод | Endpoint | Поведінка |
-|-------|----------|-----------|
+| Method | Endpoint | Behavior |
+|--------|----------|----------|
 | `repositoryExists(repo)` | `GET /repos/{owner}/{repo}` | `200` → true, `404` → false, `429` → throw `GitHubRateLimitError` |
-| `getLatestRelease(repo)` | `GET /repos/{owner}/{repo}/releases/latest` | `200` → `{tag_name, html_url}`, `404` → null (немає релізів), `429` → throw |
+| `getLatestRelease(repo)` | `GET /repos/{owner}/{repo}/releases/latest` | `200` → `{tag_name, html_url}`, `404` → null (no releases), `429` → throw |
 
-**Rate limit handling:** при статусі 429 читає заголовок `X-RateLimit-Reset` і кидає `GitHubRateLimitError` з `resetAt: Date`. Без `GITHUB_TOKEN` — 60 req/год, з токеном — 5 000 req/год.
+**Rate limit handling:** on status 429, reads the `X-RateLimit-Reset` header and throws `GitHubRateLimitError` with `resetAt: Date`. Without `GITHUB_TOKEN` — 60 req/hour; with token — 5,000 req/hour.
 
 ### 6.5 Email Service (Nodemailer)
 
-Використовує SMTP-транспорт. Два типи листів:
+Uses SMTP transport. Two email types:
 
-| Тип | Тема | Вміст |
-|-----|------|-------|
-| Confirmation | `Confirm your subscription` | Посилання `{BASE_URL}/api/confirm/{token}` |
-| Notification | `New release: {repo} {tag}` | Посилання на реліз + unsubscribe-посилання `{BASE_URL}/api/unsubscribe/{token}` |
+| Type | Subject | Content |
+|------|---------|---------|
+| Confirmation | `Confirm your subscription` | Link `{BASE_URL}/api/confirm/{token}` |
+| Notification | `New release: {repo} {tag}` | Release link + unsubscribe link `{BASE_URL}/api/unsubscribe/{token}` |
 
 ### 6.6 Config Module
 
-Fail-fast валідація env-змінних при старті:
+Fail-fast validation of env variables on startup:
 
 ```
 DATABASE_URL          → required
@@ -297,8 +272,8 @@ SMTP_USER             → required
 SMTP_PASS             → required
 SMTP_FROM             → required
 BASE_URL              → optional (default: http://localhost:3000)
-GITHUB_TOKEN          → optional (збільшує rate limit до 5 000/год)
-API_KEY               → optional (вмикає X-API-Key auth)
+GITHUB_TOKEN          → optional (increases rate limit to 5,000/hour)
+API_KEY               → optional (enables X-API-Key auth)
 SCANNER_CRON_SCHEDULE → optional (default: '0 * * * *')
 ALLOWED_ORIGIN        → optional (default: '*')
 PORT                  → optional (default: 3000)
@@ -306,31 +281,31 @@ PORT                  → optional (default: 3000)
 
 ---
 
-## 7. Модель даних
+## 7. Data Model
 
-### Схема БД
+### Database Schema
 
 ```sql
--- Відстежувані репозиторії
+-- Tracked repositories
 CREATE TABLE repositories (
-  repo          TEXT PRIMARY KEY,        -- 'owner/repo', напр. 'golang/go'
-  last_seen_tag TEXT                     -- останній відомий тег релізу, NULL якщо не перевірявся
+  repo          TEXT PRIMARY KEY,        -- 'owner/repo', e.g. 'golang/go'
+  last_seen_tag TEXT                     -- last known release tag, NULL if never checked
 );
 
--- Підписки користувачів
+-- User subscriptions
 CREATE TABLE subscriptions (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email             TEXT NOT NULL,
   repo              TEXT NOT NULL REFERENCES repositories(repo) ON DELETE CASCADE,
-  confirm_token     TEXT NOT NULL UNIQUE,      -- hex 64 символи, crypto.randomBytes(32)
-  unsubscribe_token TEXT NOT NULL UNIQUE,      -- hex 64 символи, crypto.randomBytes(32)
+  confirm_token     TEXT NOT NULL UNIQUE,      -- hex 64 chars, crypto.randomBytes(32)
+  unsubscribe_token TEXT NOT NULL UNIQUE,      -- hex 64 chars, crypto.randomBytes(32)
   status            TEXT NOT NULL DEFAULT 'pending',  -- 'pending' | 'confirmed'
 
   UNIQUE (email, repo)
 );
 ```
 
-### ER-діаграма
+### ER Diagram
 
 ```
 ┌───────────────────────┐         ┌──────────────────────────────┐
@@ -345,13 +320,13 @@ CREATE TABLE subscriptions (
                                   └──────────────────────────────┘
 ```
 
-### Міграції
+### Migrations
 
-Керуються через Knex migrations (`src/db/migrations/`). Автоматично застосовуються при старті контейнера через `docker-entrypoint.sh`:
+Managed via Knex migrations (`src/db/migrations/`). Applied automatically on container start via `docker-entrypoint.sh`:
 
 ```sh
 node dist/migrate.js   # knex migrate:latest
-node dist/index.js     # запуск сервісу
+node dist/index.js     # start the service
 ```
 
 ---
@@ -361,14 +336,14 @@ node dist/index.js     # запуск сервісу
 ### 8.1 REST API Reference
 
 **Base URL:** `/api`  
-**Content-Type:** `application/json` або `application/x-www-form-urlencoded`  
-**Auth:** `X-API-Key: <key>` (якщо `API_KEY` встановлено в `.env`)
+**Content-Type:** `application/json` or `application/x-www-form-urlencoded`  
+**Auth:** `X-API-Key: <key>` (if `API_KEY` is set in `.env`)
 
 ---
 
 #### `POST /api/subscribe`
 
-Підписатися на сповіщення про релізи репозиторію.
+Subscribe to release notifications for a repository.
 
 **Request:**
 ```json
@@ -377,53 +352,53 @@ node dist/index.js     # запуск сервісу
 
 **Responses:**
 
-| Статус | Опис |
-|--------|------|
-| `200 OK` | Підписка створена, confirmation email надіслано |
-| `400 Bad Request` | Некоректний формат email або repo |
-| `401 Unauthorized` | Відсутній або невірний API ключ |
-| `404 Not Found` | Репозиторій не знайдено на GitHub |
-| `409 Conflict` | Цей email вже підписаний на цей репозиторій |
+| Status | Description |
+|--------|-------------|
+| `200 OK` | Subscription created, confirmation email sent |
+| `400 Bad Request` | Invalid email or repo format |
+| `401 Unauthorized` | Missing or invalid API key |
+| `404 Not Found` | Repository not found on GitHub |
+| `409 Conflict` | This email is already subscribed to this repository |
 
 ---
 
 #### `GET /api/confirm/:token`
 
-Підтвердити підписку за токеном з листа.
+Confirm a subscription using the token from the confirmation email.
 
-**Path param:** `token` — hex-рядок 64 символи
+**Path param:** `token` — 64-character hex string
 
 **Responses:**
 
-| Статус | Опис |
-|--------|------|
-| `200 OK` | Підписку підтверджено |
-| `400 Bad Request` | Невірний формат токена |
-| `404 Not Found` | Токен не знайдено |
+| Status | Description |
+|--------|-------------|
+| `200 OK` | Subscription confirmed |
+| `400 Bad Request` | Invalid token format |
+| `404 Not Found` | Token not found |
 
 ---
 
 #### `GET /api/unsubscribe/:token`
 
-Відписатися за токеном з email-сповіщення.
+Unsubscribe using the token from a notification email.
 
-**Path param:** `token` — hex-рядок 64 символи
+**Path param:** `token` — 64-character hex string
 
 **Responses:**
 
-| Статус | Опис |
-|--------|------|
-| `200 OK` | Успішно відписано |
-| `400 Bad Request` | Невірний формат токена |
-| `404 Not Found` | Токен не знайдено |
+| Status | Description |
+|--------|-------------|
+| `200 OK` | Successfully unsubscribed |
+| `400 Bad Request` | Invalid token format |
+| `404 Not Found` | Token not found |
 
 ---
 
 #### `GET /api/subscriptions?email=...`
 
-Отримати всі активні підписки для email.
+Get all active subscriptions for an email address.
 
-**Query param:** `email` — адреса електронної пошти
+**Query param:** `email` — email address
 
 **Response `200`:**
 ```json
@@ -441,33 +416,90 @@ node dist/index.js     # запуск сервісу
 
 ### 8.2 GitHub REST API Integration
 
-| Ціль | Endpoint | Метод |
-|------|----------|-------|
-| Перевірка існування репо | `https://api.github.com/repos/{owner}/{repo}` | GET |
-| Отримання останнього релізу | `https://api.github.com/repos/{owner}/{repo}/releases/latest` | GET |
+| Purpose | Endpoint | Method |
+|---------|----------|--------|
+| Check repository existence | `https://api.github.com/repos/{owner}/{repo}` | GET |
+| Get latest release | `https://api.github.com/repos/{owner}/{repo}/releases/latest` | GET |
 
 **Headers:**
 ```
 Accept: application/vnd.github+json
 X-GitHub-Api-Version: 2022-11-28
-Authorization: Bearer {GITHUB_TOKEN}   (опціонально)
+Authorization: Bearer {GITHUB_TOKEN}   (optional)
 ```
 
 **Rate limits:**
 
-| Режим | Ліміт |
-|-------|-------|
-| Без токена | 60 req/год (per IP) |
-| З `GITHUB_TOKEN` | 5 000 req/год |
+| Mode | Limit |
+|------|-------|
+| Without token | 60 req/hour (per IP) |
+| With `GITHUB_TOKEN` | 5,000 req/hour |
 
-При перевищенні ліміту (статус 429) сервіс кидає `GitHubRateLimitError` та логує час скидання ліміту з `X-RateLimit-Reset`.
+When the rate limit is exceeded (status 429), the service throws `GitHubRateLimitError` and logs the reset time from `X-RateLimit-Reset`.
 
 ### 8.3 SMTP Integration
 
-Nodemailer через стандартний SMTP. Сумісний із будь-яким SMTP-провайдером:
+Nodemailer over standard SMTP. Compatible with any SMTP provider:
 
-| Провайдер | SMTP_HOST | SMTP_PORT |
-|-----------|-----------|-----------|
+| Provider | SMTP_HOST | SMTP_PORT |
+|----------|-----------|-----------|
 | Gmail | `smtp.gmail.com` | `587` |
 | Resend | `smtp.resend.com` | `465` |
 | Mailgun | `smtp.mailgun.org` | `587` |
+
+---
+
+## 9. Future Work
+
+### Duplicate Notifications Under Horizontal Scaling
+
+**Problem:** when multiple service instances are running, each independently triggers `node-cron` and executes a full scan cycle. All instances send emails simultaneously — subscribers receive duplicate notifications.
+
+#### Option 1 — PostgreSQL Advisory Lock (minimal changes)
+
+Before starting the scan cycle, an instance attempts to acquire a session-level advisory lock via `pg_try_advisory_lock(bigint)`. If the lock is already held by another instance, the current one simply skips the tick.
+
+```sql
+-- scanner executes before starting work
+SELECT pg_try_advisory_lock(12345);
+-- returns true  → this instance runs the scan
+-- returns false → another instance is already running, skip tick
+```
+
+**Pros:** requires no new infrastructure; implemented in a few lines of code.  
+**Cons:** the lock is tied to the session — a crashed process automatically releases the lock, but there may be a window with no scanning between process death and the next tick.
+
+#### Option 2 — Leader Election with Heartbeat
+
+Extension of Option 1: a background interval (e.g. every 30 s) holds the lock and updates `last_heartbeat` in a dedicated `scanner_leader` table. Other instances check heartbeat freshness and take over the leader role if the current leader has been silent for longer than N seconds.
+
+```sql
+CREATE TABLE scanner_leader (
+  id             INT PRIMARY KEY DEFAULT 1,  -- always a single row
+  instance_id    TEXT NOT NULL,
+  last_heartbeat TIMESTAMPTZ NOT NULL
+);
+```
+
+**Pros:** automatic failover when the leader crashes; transparent logic.  
+**Cons:** additional table + heartbeat logic; slight extra DB load.
+
+#### Option 3 — Extract the Scanner into a Dedicated Worker
+
+Move the scan cycle into a standalone service/container (`scanner-worker`) that is always deployed as a single instance (`replicas: 1` in Docker Compose / Kubernetes Deployment). The HTTP server scales horizontally and independently.
+
+```
+                  ┌─────────────────────┐
+   Load Balancer  │  api (replicas: N)  │  ← horizontally scaled
+                  └─────────────────────┘
+                  ┌─────────────────────┐
+                  │ scanner (replicas:1)│  ← always a single instance
+                  └─────────────────────┘
+```
+
+**Pros:** architecturally clean separation of concerns; eliminates the duplication problem without any lock mechanisms.  
+**Cons:** requires refactoring the deployment and a separate Docker image or entrypoint.
+
+#### Recommended Path
+
+For the current constraints (single EC2), **Option 1** is sufficient — it eliminates the risk of duplicate notifications if two instances are accidentally started, with zero infrastructure changes. When moving to production-scale with multiple replicas, **Option 3** is the architecturally robust solution.
