@@ -1,97 +1,97 @@
-# ADR-001: Caddy як reverse proxy з автоматичним TLS
+# ADR-001: Caddy as a Reverse Proxy with Automatic TLS
 
-**Статус:** Прийнято
+**Status:** Accepted
 
-**Дата:** 2026-05-06
+**Date:** 2026-05-06
 
-**Автор:** [Stanislav Hohulia](https://github.com/Hradivnyk)
+**Author:** [Stanislav Hohulia](https://github.com/Hradivnyk)
 
-## Контекст
+## Context
 
-Сервіс розгортається на одному EC2-інстансі через Docker Compose. Для production-середовища необхідно:
+The service is deployed on a single EC2 instance via Docker Compose. For the production environment it is necessary to:
 
-- приймати зовнішній HTTPS-трафік на портах 80/443,
-- TLS закінчується на проксі; до Node йде вже нешифрований трафік,
-- автоматично отримувати та оновлювати TLS-сертифікат без ручного втручання,
-- мінімізувати операційне навантаження на одноосібно підтримуваному проекті.
+- accept external HTTPS traffic on ports 80/443,
+- terminate TLS at the proxy; unencrypted traffic is forwarded to Node,
+- automatically obtain and renew TLS certificates without manual intervention,
+- minimise operational overhead for a solo-maintained project.
 
-## Розглянуті варіанти
+## Considered Options
 
 ### 1. Caddy 2
-Сучасний HTTP-сервер з вбудованим автоматичним TLS через Let's Encrypt/ZeroSSL.
+A modern HTTP server with built-in automatic TLS via Let's Encrypt/ZeroSSL.
 
-**Плюси:**
-- Автоматичне отримання і оновлення сертифіката без зовнішніх інструментів.
-- Мінімальна конфігурація — весь reverse proxy зводиться до трьох рядків у `Caddyfile`.
-- HTTP → HTTPS редирект і HTTP/2 увімкнені за замовчуванням.
-- Зберігає стан сертифікатів у Docker volume — не втрачається при перезбірці образу.
+**Pros:**
+- Automatic certificate issuance and renewal with no external tools.
+- Minimal configuration — the entire reverse proxy fits in three lines of a `Caddyfile`.
+- HTTP → HTTPS redirect and HTTP/2 enabled by default.
+- Certificate state is stored in a Docker volume — survives image rebuilds.
 
-**Мінуси:**
-- Менша екосистема модулів порівняно з nginx.
-- При масштабуванні до кількох інстансів потребує централізованого сховища сертифікатів.
+**Cons:**
+- Smaller module ecosystem compared to nginx.
+- Scaling to multiple instances requires a centralised certificate store.
 
 ---
 
 ### 2. Traefik
-Reverse proxy орієнтований на динамічні контейнерні середовища (Swarm, Kubernetes). Також має вбудований автоматичний TLS.
+A reverse proxy designed for dynamic container environments (Swarm, Kubernetes). Also has built-in automatic TLS.
 
-**Плюси:**
-- Автоматичне виявлення сервісів через Docker labels — зручно коли сервіси з'являються і зникають динамічно.
-- Вбудований dashboard для моніторингу маршрутів.
+**Pros:**
+- Automatic service discovery via Docker labels — convenient when services appear and disappear dynamically.
+- Built-in dashboard for route monitoring.
 
-**Мінуси:**
-- Конфігурація розпорошена між статичним `traefik.yml` і labels у `docker-compose.yml` — складніше читати і підтримувати.
-- Орієнтований на оркестровані середовища; для статичного Compose з одним сервісом це надлишкова абстракція.
+**Cons:**
+- Configuration is split between a static `traefik.yml` and labels in `docker-compose.yml` — harder to read and maintain.
+- Designed for orchestrated environments; for a static Compose stack with a single service this is an unnecessary abstraction.
 
 ---
 
 ### 3. nginx + certbot
-Широко розповсюджений reverse proxy з окремим інструментом для управління сертифікатами.
+A widely used reverse proxy with a separate tool for certificate management.
 
-**Плюси:**
-- Величезна екосистема, документація і спільнота.
-- Гнучка конфігурація для складних сценаріїв маршрутизації.
+**Pros:**
+- Vast ecosystem, documentation, and community.
+- Flexible configuration for complex routing scenarios.
 
-**Мінуси:**
-- Сертифікати не входять до nginx — потребує окремого certbot або acme.sh.
-- Ротація сертифіката потребує cron-задачі і перезапуску nginx-процесу.
-- Значно більше конфігураційних файлів порівняно з Caddy.
+**Cons:**
+- Certificates are not part of nginx — requires a separate certbot or acme.sh.
+- Certificate rotation requires a cron job and an nginx process restart.
+- Significantly more configuration files compared to Caddy.
 
 ---
 
 ### 4. AWS ALB + ACM
-Керований load balancer із сертифікатами від AWS Certificate Manager.
+A managed load balancer with certificates from AWS Certificate Manager.
 
-**Плюси:**
-- Нативна інтеграція з AWS-інфраструктурою; природний вибір при горизонтальному масштабуванні.
-- ACM видає і оновлює сертифікати автоматично без будь-яких налаштувань на сервері.
-- Висока надійність із SLA від AWS.
+**Pros:**
+- Native integration with AWS infrastructure; the natural choice when scaling horizontally.
+- ACM issues and renews certificates automatically with no server-side configuration.
+- High reliability with an AWS SLA.
 
-**Мінуси:**
-- ACM не видає приватний ключ назовні — сертифікат можна використати лише через ALB (або CloudFront/API Gateway). Для EC2-деплою ALB стає обов'язковою ланкою.
-- ALB коштує ~$20/міс фіксовано незалежно від трафіку.
-- Потребує налаштування IAM-ролей, target groups, listeners і security groups.
+**Cons:**
+- ACM does not export the private key — the certificate can only be used via ALB (or CloudFront/API Gateway). For an EC2 deployment ALB becomes a required component.
+- ALB costs ~$20/month fixed regardless of traffic.
+- Requires configuring IAM roles, target groups, listeners, and security groups.
 
 ---
 
-### 5. Node.js напряму на порту 443
-Запуск Node.js процесу без окремого reverse proxy.
+### 5. Node.js directly on port 443
+Running the Node.js process without a separate reverse proxy.
 
-**Плюси:**
-- Відсутній додатковий компонент у стеку.
+**Pros:**
+- No additional component in the stack.
 
-**Мінуси:**
-- Потребує запуску процесу від root (порти < 1024) або налаштування `CAP_NET_BIND_SERVICE`.
-- Управління сертифікатами ускладнюється всередині застосунку.
-- Відсутній HTTP → HTTPS редирект і HTTP/2 без додаткового коду.
+**Cons:**
+- Requires running the process as root (ports < 1024) or configuring `CAP_NET_BIND_SERVICE`.
+- Certificate management becomes complex inside the application.
+- No HTTP → HTTPS redirect or HTTP/2 without extra code.
 
-## Прийняте рішення
+## Decision
 
-Використовувати **Caddy 2** (`caddy:2-alpine`) як reverse proxy у production Docker Compose профілі.
+Use **Caddy 2** (`caddy:2-alpine`) as the reverse proxy in the production Docker Compose profile.
 
-Caddy обраний тому, що єдиний з розглянутих варіантів повністю задовольняє всі вимоги без додаткових інструментів: автоматичний TLS, HTTP → HTTPS редирект і зберігання сертифікатів вирішуються самим Caddy без cron-задач, certbot, IAM-ролей чи привілейованого процесу. Порівняно з Traefik — єдиним іншим варіантом з вбудованим TLS — Caddy має значно простішу конфігурацію для статичного Docker Compose: весь reverse proxy зведено до одного файлу з трьома рядками, тоді як Traefik потребує двох конфігураційних файлів і labels на кожному сервісі. Для одноосібно підтримуваного MVP це критично — менше конфігурації означає менше місць де щось може зламатись.
+Caddy was chosen because it is the only option among those considered that fully satisfies all requirements without additional tools: automatic TLS, HTTP → HTTPS redirect, and certificate storage are all handled by Caddy itself with no cron jobs, certbot, IAM roles, or privileged processes. Compared to Traefik — the only other option with built-in TLS — Caddy has a significantly simpler configuration for a static Docker Compose stack: the entire reverse proxy is reduced to a single file with three lines, whereas Traefik requires two configuration files and labels on every service. For a solo-maintained MVP this is critical — less configuration means fewer places where something can break.
 
-Конфігурація у `Caddyfile`:
+Configuration in `Caddyfile`:
 
 ```
 {$DOMAIN} {
@@ -99,33 +99,33 @@ Caddy обраний тому, що єдиний з розглянутих ва�
 }
 ```
 
-Caddy автоматично:
-- отримує та оновлює сертифікат Let's Encrypt за доменом із змінної `DOMAIN`,
-- перенаправляє HTTP → HTTPS,
-- зберігає сертифікати у named volume `caddy_data`.
+Caddy automatically:
+- obtains and renews a Let's Encrypt certificate for the domain specified in the `DOMAIN` variable,
+- redirects HTTP → HTTPS,
+- stores certificates in the named volume `caddy_data`.
 
-У `docker-compose.yml` сервіс `caddy` винесено до профілю `production`, тому локальна розробка запускається без нього.
+In `docker-compose.yml` the `caddy` service is placed under the `production` profile, so local development runs without it.
 
-## Наслідки
+## Consequences
 
-**Позитивні:**
-- Нульові операційні витрати на TLS: сертифікати оновлюються автоматично без cron-задач і перезапуску.
-- Мінімальна конфігурація — один Caddyfile з трьома рядками замість nginx.conf + certbot.
-- Caddy зберігає стан сертифікатів у Docker volume, тому сертифікат не втрачається при перезбірці образу.
-- Вбудована підтримка HTTP/2 та HTTPS-редиректу.
+**Positive:**
+- Zero operational cost for TLS: certificates are renewed automatically with no cron jobs or restarts.
+- Minimal configuration — a single Caddyfile with three lines instead of nginx.conf + certbot.
+- Caddy stores certificate state in a Docker volume, so certificates survive image rebuilds.
+- Built-in HTTP/2 and HTTPS redirect support.
 
-**Негативні / компроміси:**
-- Менша екосистема модулів порівняно з nginx (не критично для поточних цілей).
-- При зміні домену необхідно вручну очищати volume `caddy_data`, інакше залишаться старі сертифікати.
-- `caddy_data` — єдине місце зберігання сертифікатів, але його втрата не є катастрофою: Caddy автоматично отримає новий сертифікат при наступному старті (~1 хв downtime). Однак часте видалення volume (`docker volume rm caddy_data`) вичерпує ліміт Let's Encrypt — 5 повторних сертифікатів на тиждень. При перевищенні ліміту видача блокується на 7 днів. Бекап volume не потрібен, але зловживати його видаленням не варто.
-- Якщо проект масштабується до кількох інстансів, потрібне або централізоване сховище сертифікатів (наприклад, Caddy з Consul), або перехід на AWS ALB.
+**Negative / trade-offs:**
+- Smaller module ecosystem compared to nginx (not critical for current goals).
+- When changing the domain the `caddy_data` volume must be cleared manually, otherwise stale certificates will remain.
+- `caddy_data` is the single storage location for certificates, but losing it is not catastrophic: Caddy will automatically obtain a new certificate on the next start (~1 min downtime). However, frequently deleting the volume (`docker volume rm caddy_data`) exhausts the Let's Encrypt rate limit — 5 duplicate certificates per week. Exceeding this limit blocks issuance for 7 days. Backing up the volume is not necessary, but the volume should not be deleted carelessly.
+- If the project scales to multiple instances, either a centralised certificate store (e.g. Caddy with Consul) or a migration to AWS ALB will be required.
 
-**Передумови для успішного першого старту:**
+**Prerequisites for a successful first start:**
 
-Перед запуском `docker compose --profile production up` необхідно переконатись що:
-1. DNS A-запис домену вказує на публічний IP цього EC2-інстансу і вже пропагував (перевіряється через `dig` або `nslookup`).
-2. Порт 80 відкритий у Security Group інстансу — Caddy використовує його для HTTP-01 challenge.
-3. Порт 443 відкритий у Security Group для прийому HTTPS-трафіку після отримання сертифіката.
+Before running `docker compose --profile production up` ensure that:
+1. The DNS A record for the domain points to the public IP of this EC2 instance and has already propagated (verify with `dig` or `nslookup`).
+2. Port 80 is open in the instance's Security Group — Caddy uses it for the HTTP-01 challenge.
+3. Port 443 is open in the Security Group to accept HTTPS traffic after the certificate is obtained.
 
-Якщо всі три умови виконані — Caddy отримає сертифікат при першому старті без додаткових дій.
+If all three conditions are met, Caddy will obtain the certificate on first start with no additional steps.
 
