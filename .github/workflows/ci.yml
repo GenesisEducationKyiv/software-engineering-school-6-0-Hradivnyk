@@ -1,8 +1,5 @@
 name: CI
 
-# Run CI on every PR targeting main and on direct pushes to main (after merge).
-# Two separate events avoid duplicate runs: pull_request fires on feature branches,
-# push fires only after the merge commit lands on main (which also triggers deploy).
 on:
   push:
     branches: [main]
