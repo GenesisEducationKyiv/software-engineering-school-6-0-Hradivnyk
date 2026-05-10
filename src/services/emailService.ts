@@ -1,7 +1,21 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config/index.js';
 
-export class EmailService {
+export interface IEmailService {
+  sendConfirmationEmail(
+    email: string,
+    token: string,
+    repo: string,
+  ): Promise<void>;
+  sendNotificationEmail(
+    email: string,
+    repo: string,
+    tag: string,
+    token: string,
+  ): Promise<void>;
+}
+
+export class EmailService implements IEmailService {
   private readonly transporter = nodemailer.createTransport({
     host: config.email.host,
     port: config.email.port,

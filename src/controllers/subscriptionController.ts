@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import type { Subscription } from '../types.js';
 import { subscriptionService } from '../services/subscriptionService.js';
 import {
   subscribeSchema,
@@ -6,7 +7,17 @@ import {
   emailQuerySchema,
 } from '../schemas/subscriptionSchemas.js';
 
+// The controller owns the contract it depends on — a core tenet of DIP.
+export interface ISubscriptionService {
+  subscribe(email: string, repo: string): Promise<void>;
+  confirm(token: string): Promise<void>;
+  unsubscribe(token: string): Promise<void>;
+  getSubscriptions(email: string): Promise<Subscription[]>;
+}
+
 export class SubscriptionController {
+  constructor(private readonly subscriptionService: ISubscriptionService) {}
+
   async subscribe(
     req: Request,
     res: Response,
@@ -14,7 +25,7 @@ export class SubscriptionController {
   ): Promise<void> {
     try {
       const { email, repo } = subscribeSchema.parse(req.body);
-      await subscriptionService.subscribe(email, repo);
+      await this.subscriptionService.subscribe(email, repo);
       res
         .status(200)
         .json({ message: 'Subscription successful. Confirmation email sent.' });
@@ -30,7 +41,7 @@ export class SubscriptionController {
   ): Promise<void> {
     try {
       const { token } = tokenSchema.parse(req.params);
-      await subscriptionService.confirm(token);
+      await this.subscriptionService.confirm(token);
       res.status(200).json({ message: 'Subscription confirmed successfully.' });
     } catch (err) {
       next(err);
@@ -44,7 +55,7 @@ export class SubscriptionController {
   ): Promise<void> {
     try {
       const { token } = tokenSchema.parse(req.params);
-      await subscriptionService.unsubscribe(token);
+      await this.subscriptionService.unsubscribe(token);
       res.status(200).json({ message: 'Unsubscribed successfully.' });
     } catch (err) {
       next(err);
@@ -58,7 +69,8 @@ export class SubscriptionController {
   ): Promise<void> {
     try {
       const { email } = emailQuerySchema.parse(req.query);
-      const subscriptions = await subscriptionService.getSubscriptions(email);
+      const subscriptions =
+        await this.subscriptionService.getSubscriptions(email);
       res.status(200).json(subscriptions);
     } catch (err) {
       next(err);
@@ -66,4 +78,6 @@ export class SubscriptionController {
   }
 }
 
-export const subscriptionController = new SubscriptionController();
+export const subscriptionController = new SubscriptionController(
+  subscriptionService,
+);

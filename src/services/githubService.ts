@@ -8,7 +8,12 @@ export interface Release {
   html_url: string;
 }
 
-export class GithubService {
+export interface IGithubService {
+  repositoryExists(repo: string): Promise<boolean>;
+  getLatestRelease(repo: string): Promise<Release | null>;
+}
+
+export class GithubService implements IGithubService {
   private readonly headers: HeadersInit;
 
   constructor() {

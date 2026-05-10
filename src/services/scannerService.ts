@@ -1,8 +1,14 @@
-import type { ConfirmedSubscriptionWithToken } from '../models/subscriptionModel.js';
+import type {
+  ConfirmedSubscriptionWithToken,
+  ISubscriptionModel,
+} from '../models/subscriptionModel.js';
 import { subscriptionModel } from '../models/subscriptionModel.js';
+import type { IRepositoryModel } from '../models/repositoryModel.js';
 import { repositoryModel } from '../models/repositoryModel.js';
 import logger from '../utils/logger.js';
+import type { IEmailService } from './emailService.js';
 import { emailService } from './emailService.js';
+import type { IGithubService } from './githubService.js';
 import { githubService } from './githubService.js';
 
 function groupByRepo(
@@ -18,12 +24,19 @@ function groupByRepo(
 }
 
 export class ScannerService {
+  constructor(
+    private readonly subscriptionModel: ISubscriptionModel,
+    private readonly repositoryModel: IRepositoryModel,
+    private readonly emailService: IEmailService,
+    private readonly githubService: IGithubService,
+  ) {}
+
   private async processRepo(
     repo: string,
     subscribers: ConfirmedSubscriptionWithToken[],
   ): Promise<void> {
     try {
-      const release = await githubService.getLatestRelease(repo);
+      const release = await this.githubService.getLatestRelease(repo);
 
       if (!release) {
         logger.debug({ repo }, 'Scanner: no releases found');
@@ -47,7 +60,7 @@ export class ScannerService {
 
       await Promise.allSettled(
         subscribers.map(async (sub) =>
-          emailService
+          this.emailService
             .sendNotificationEmail(
               sub.email,
               repo,
@@ -63,7 +76,7 @@ export class ScannerService {
         ),
       );
 
-      await repositoryModel.updateLastSeenTag(repo, release.tag_name);
+      await this.repositoryModel.updateLastSeenTag(repo, release.tag_name);
     } catch (err) {
       logger.error({ err, repo }, 'Scanner: error processing repo');
     }
@@ -72,7 +85,8 @@ export class ScannerService {
   async scan(): Promise<void> {
     logger.info('Scanner: starting release check');
 
-    const subscriptions = await subscriptionModel.findAllConfirmedWithTokens();
+    const subscriptions =
+      await this.subscriptionModel.findAllConfirmedWithTokens();
 
     if (subscriptions.length === 0) {
       logger.info('Scanner: no active subscriptions, skipping');
@@ -90,4 +104,9 @@ export class ScannerService {
   }
 }
 
-export const scannerService = new ScannerService();
+export const scannerService = new ScannerService(
+  subscriptionModel,
+  repositoryModel,
+  emailService,
+  githubService,
+);

@@ -1,6 +1,11 @@
 import knex from '../db/knex.js';
 
-export class RepositoryModel {
+export interface IRepositoryModel {
+  upsert(repo: string): Promise<void>;
+  updateLastSeenTag(repo: string, tag: string): Promise<void>;
+}
+
+export class RepositoryModel implements IRepositoryModel {
   async upsert(repo: string): Promise<void> {
     await knex('repositories').insert({ repo }).onConflict('repo').ignore();
   }

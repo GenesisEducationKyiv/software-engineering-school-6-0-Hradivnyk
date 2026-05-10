@@ -15,7 +15,21 @@ export interface ConfirmedSubscriptionWithToken {
   last_seen_tag: string | null;
 }
 
-export class SubscriptionModel {
+export interface ISubscriptionModel {
+  create(
+    email: string,
+    repo: string,
+    confirmToken: string,
+    unsubscribeToken: string,
+  ): Promise<void>;
+  existsByEmailAndRepo(email: string, repo: string): Promise<boolean>;
+  confirm(confirmToken: string): Promise<boolean>;
+  deleteByUnsubscribeToken(unsubscribeToken: string): Promise<boolean>;
+  findAllConfirmedWithTokens(): Promise<ConfirmedSubscriptionWithToken[]>;
+  findByEmail(email: string): Promise<Subscription[]>;
+}
+
+export class SubscriptionModel implements ISubscriptionModel {
   // Ensures the repository exists, then inserts a new pending subscription with both tokens.
   async create(
     email: string,
