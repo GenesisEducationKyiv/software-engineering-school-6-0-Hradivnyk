@@ -12,8 +12,7 @@ import type { IEmailService } from './emailService.js';
 import { emailService } from './emailService.js';
 import type { IGithubService } from './githubService.js';
 import { githubService } from './githubService.js';
-
-const TOKEN_REGEX = /^[0-9a-f]{64}$/;
+import { TOKEN_REGEX } from '../schemas/subscriptionSchemas.js';
 
 export interface ISubscriptionService {
   subscribe(email: string, repo: string): Promise<void>;
