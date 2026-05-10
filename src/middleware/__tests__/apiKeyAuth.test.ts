@@ -1,12 +1,25 @@
 import type { Request, Response, NextFunction } from 'express';
 import { apiKeyAuth } from '../apiKeyAuth.js';
 import { UnauthorizedError } from '../../errors.js';
+import { config } from '../../config/index.js';
+
+jest.mock('../../config/index.js', () => ({
+  config: {
+    auth: { apiKey: '' },
+  },
+}));
+
+// Cast away readonly so beforeEach can switch the key between scenarios.
+// The mock object is not truly const, so mutation works at runtime.
+const mutableConfig = config as { auth: { apiKey: string } };
 
 function mockReq(headers: Record<string, string> = {}): Request {
   return { headers } as unknown as Request;
 }
 
 const mockRes = {} as Response;
+
+const CONFIGURED_KEY = 'test-api-key';
 
 describe('apiKeyAuth middleware', () => {
   let next: jest.MockedFunction<NextFunction>;
@@ -17,11 +30,7 @@ describe('apiKeyAuth middleware', () => {
 
   describe('when API_KEY is not configured', () => {
     beforeEach(() => {
-      process.env.API_KEY = '';
-    });
-
-    afterEach(() => {
-      process.env.API_KEY = 'test-api-key';
+      mutableConfig.auth.apiKey = '';
     });
 
     it('should call next() without error when no header is provided', () => {
@@ -38,10 +47,8 @@ describe('apiKeyAuth middleware', () => {
   });
 
   describe('when API_KEY is configured', () => {
-    const CONFIGURED_KEY = 'test-api-key';
-
     beforeEach(() => {
-      process.env.API_KEY = CONFIGURED_KEY;
+      mutableConfig.auth.apiKey = CONFIGURED_KEY;
     });
 
     it('should call next() when the correct key is provided', () => {

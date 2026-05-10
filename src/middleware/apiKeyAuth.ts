@@ -1,15 +1,16 @@
 import type { Request, Response, NextFunction } from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { UnauthorizedError } from '../errors.js';
+import { config } from '../config/index.js';
 
 export function apiKeyAuth(
   req: Request,
   _res: Response,
   next: NextFunction,
 ): void {
-  const configuredKey = process.env.API_KEY ?? '';
+  const apiKey = config.auth.apiKey;
 
-  if (!configuredKey) {
+  if (!apiKey) {
     next();
     return;
   }
@@ -21,7 +22,7 @@ export function apiKeyAuth(
     return;
   }
 
-  const configuredBuf = Buffer.from(configuredKey);
+  const configuredBuf = Buffer.from(apiKey);
   const providedBuf = Buffer.from(provided);
 
   if (
