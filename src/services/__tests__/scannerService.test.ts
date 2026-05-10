@@ -4,8 +4,6 @@ import type { IEmailService } from '../emailService.js';
 import type { IGithubService } from '../githubService.js';
 import { ScannerService } from '../scannerService.js';
 
-jest.mock('../../db/knex.js', () => ({}));
-
 const REPO_A = 'owner/repo-a';
 const REPO_B = 'owner/repo-b';
 

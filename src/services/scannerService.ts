@@ -2,14 +2,10 @@ import type {
   ConfirmedSubscriptionWithToken,
   ISubscriptionModel,
 } from '../models/subscriptionModel.js';
-import { subscriptionModel } from '../models/subscriptionModel.js';
 import type { IRepositoryModel } from '../models/repositoryModel.js';
-import { repositoryModel } from '../models/repositoryModel.js';
 import logger from '../utils/logger.js';
 import type { IEmailService } from './emailService.js';
-import { emailService } from './emailService.js';
 import type { IGithubService } from './githubService.js';
-import { githubService } from './githubService.js';
 
 function groupByRepo(
   subscriptions: ConfirmedSubscriptionWithToken[],
@@ -103,10 +99,3 @@ export class ScannerService {
     logger.info('Scanner: release check complete');
   }
 }
-
-export const scannerService = new ScannerService(
-  subscriptionModel,
-  repositoryModel,
-  emailService,
-  githubService,
-);

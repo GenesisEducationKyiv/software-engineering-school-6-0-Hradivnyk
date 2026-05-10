@@ -7,11 +7,8 @@ import {
   TokenNotFoundError,
 } from '../errors.js';
 import type { ISubscriptionModel } from '../models/subscriptionModel.js';
-import { subscriptionModel } from '../models/subscriptionModel.js';
 import type { IEmailService } from './emailService.js';
-import { emailService } from './emailService.js';
 import type { IGithubService } from './githubService.js';
-import { githubService } from './githubService.js';
 import { TOKEN_REGEX } from '../schemas/subscriptionSchemas.js';
 
 export interface ISubscriptionService {
@@ -66,9 +63,3 @@ export class SubscriptionService implements ISubscriptionService {
     return this.subscriptionModel.findByEmail(email);
   }
 }
-
-export const subscriptionService = new SubscriptionService(
-  subscriptionModel,
-  emailService,
-  githubService,
-);

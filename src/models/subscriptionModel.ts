@@ -1,6 +1,6 @@
 import knex from '../db/knex.js';
 import type { Subscription } from '../types.js';
-import { repositoryModel } from './repositoryModel.js';
+import type { IRepositoryModel } from './repositoryModel.js';
 
 interface SubscriptionRow {
   email: string;
@@ -30,6 +30,8 @@ export interface ISubscriptionModel {
 }
 
 export class SubscriptionModel implements ISubscriptionModel {
+  constructor(private readonly repositoryModel: IRepositoryModel) {}
+
   // Ensures the repository exists, then inserts a new pending subscription with both tokens.
   async create(
     email: string,
@@ -37,7 +39,7 @@ export class SubscriptionModel implements ISubscriptionModel {
     confirmToken: string,
     unsubscribeToken: string,
   ): Promise<void> {
-    await repositoryModel.upsert(repo);
+    await this.repositoryModel.upsert(repo);
     await knex('subscriptions').insert({
       email,
       repo,
@@ -108,5 +110,3 @@ export class SubscriptionModel implements ISubscriptionModel {
     }));
   }
 }
-
-export const subscriptionModel = new SubscriptionModel();

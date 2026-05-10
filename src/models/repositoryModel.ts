@@ -14,5 +14,3 @@ export class RepositoryModel implements IRepositoryModel {
     await knex('repositories').where({ repo }).update({ last_seen_tag: tag });
   }
 }
-
-export const repositoryModel = new RepositoryModel();

@@ -84,5 +84,3 @@ export class GithubService implements IGithubService {
     );
   }
 }
-
-export const githubService = new GithubService();

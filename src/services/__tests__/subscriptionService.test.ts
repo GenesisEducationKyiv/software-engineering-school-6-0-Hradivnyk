@@ -9,8 +9,6 @@ import type { IEmailService } from '../emailService.js';
 import type { IGithubService } from '../githubService.js';
 import { SubscriptionService } from '../subscriptionService.js';
 
-jest.mock('../../db/knex.js', () => ({}));
-
 const VALID_TOKEN = 'a'.repeat(64);
 const EMAIL = 'user@example.com';
 const REPO = 'owner/repo';

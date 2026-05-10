@@ -68,5 +68,3 @@ export class EmailService implements IEmailService {
     });
   }
 }
-
-export const emailService = new EmailService();

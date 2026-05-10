@@ -1,6 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { Subscription } from '../types.js';
-import { subscriptionService } from '../services/subscriptionService.js';
 import {
   subscribeSchema,
   tokenSchema,
@@ -77,7 +76,3 @@ export class SubscriptionController {
     }
   }
 }
-
-export const subscriptionController = new SubscriptionController(
-  subscriptionService,
-);

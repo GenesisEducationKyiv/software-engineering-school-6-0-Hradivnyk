@@ -10,8 +10,6 @@ import {
   type ISubscriptionService,
 } from '../subscriptionController.js';
 
-jest.mock('../../db/knex.js', () => ({}));
-
 const VALID_TOKEN = 'a'.repeat(64);
 const EMAIL = 'user@example.com';
 const REPO = 'owner/repo';
