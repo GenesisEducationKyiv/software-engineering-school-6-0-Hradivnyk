@@ -19,6 +19,57 @@ function groupByRepo(
 }
 
 export class ScannerService {
+  private async processRepo(
+    repo: string,
+    subscribers: ConfirmedSubscriptionWithToken[],
+  ): Promise<void> {
+    try {
+      const release = await githubService.getLatestRelease(repo);
+
+      if (!release) {
+        logger.debug({ repo }, 'Scanner: no releases found');
+        return;
+      }
+
+      const lastSeenTag = subscribers[0].last_seen_tag;
+
+      if (release.tag_name === lastSeenTag) {
+        logger.debug(
+          { repo, tag: release.tag_name },
+          'Scanner: no new release',
+        );
+        return;
+      }
+
+      logger.info(
+        { repo, tag: release.tag_name },
+        'Scanner: new release detected, sending notifications',
+      );
+
+      await Promise.allSettled(
+        subscribers.map(async (sub) =>
+          emailService
+            .sendNotificationEmail(
+              sub.email,
+              repo,
+              release.tag_name,
+              sub.unsubscribe_token,
+            )
+            .catch((err: unknown) => {
+              logger.error(
+                { err, email: sub.email, repo },
+                'Scanner: failed to send notification email',
+              );
+            }),
+        ),
+      );
+
+      await subscriptionModel.updateLastSeenTag(repo, release.tag_name);
+    } catch (err) {
+      logger.error({ err, repo }, 'Scanner: error processing repo');
+    }
+  }
+
   async scan(): Promise<void> {
     logger.info('Scanner: starting release check');
 
@@ -31,52 +82,9 @@ export class ScannerService {
 
     const byRepo = groupByRepo(subscriptions);
 
-    for (const [repo, subscribers] of byRepo) {
-      try {
-        const release = await githubService.getLatestRelease(repo);
-
-        if (!release) {
-          logger.debug({ repo }, 'Scanner: no releases found');
-          continue;
-        }
-
-        const lastSeenTag = subscribers[0].last_seen_tag;
-
-        if (release.tag_name === lastSeenTag) {
-          logger.debug(
-            { repo, tag: release.tag_name },
-            'Scanner: no new release',
-          );
-          continue;
-        }
-
-        logger.info(
-          { repo, tag: release.tag_name },
-          'Scanner: new release detected, sending notifications',
-        );
-
-        await Promise.allSettled(
-          subscribers.map((sub) =>
-            emailService
-              .sendNotificationEmail(
-                sub.email,
-                repo,
-                release.tag_name,
-                sub.unsubscribe_token,
-              )
-              .catch((err: unknown) => {
-                logger.error(
-                  { err, email: sub.email, repo },
-                  'Scanner: failed to send notification email',
-                );
-              }),
-          ),
-        );
-
-        await subscriptionModel.updateLastSeenTag(repo, release.tag_name);
-      } catch (err) {
-        logger.error({ err, repo }, 'Scanner: error processing repo');
-      }
+    for (const [repo, subscribers] of byRepo.entries()) {
+      // eslint-disable-next-line no-await-in-loop
+      await this.processRepo(repo, subscribers); // sequential to respect GitHub API rate limits
     }
 
     logger.info('Scanner: release check complete');

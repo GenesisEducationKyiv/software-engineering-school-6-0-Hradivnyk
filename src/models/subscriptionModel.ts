@@ -34,7 +34,9 @@ export class SubscriptionModel {
 
   // Returns true if a subscription for the given email and repo already exists.
   async existsByEmailAndRepo(email: string, repo: string): Promise<boolean> {
-    const row = await knex('subscriptions').where({ email, repo }).first();
+    const row: unknown = await knex('subscriptions')
+      .where({ email, repo })
+      .first();
     return row !== undefined;
   }
 
