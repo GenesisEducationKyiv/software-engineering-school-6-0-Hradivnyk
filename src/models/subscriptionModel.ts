@@ -1,5 +1,6 @@
 import knex from '../db/knex.js';
 import type { Subscription } from '../types.js';
+import { repositoryModel } from './repositoryModel.js';
 
 interface SubscriptionRow {
   email: string;
@@ -15,14 +16,14 @@ export interface ConfirmedSubscriptionWithToken {
 }
 
 export class SubscriptionModel {
-  // Upserts the repository and inserts a new pending subscription with both tokens.
+  // Ensures the repository exists, then inserts a new pending subscription with both tokens.
   async create(
     email: string,
     repo: string,
     confirmToken: string,
     unsubscribeToken: string,
   ): Promise<void> {
-    await knex('repositories').insert({ repo }).onConflict('repo').ignore();
+    await repositoryModel.upsert(repo);
     await knex('subscriptions').insert({
       email,
       repo,
@@ -69,11 +70,6 @@ export class SubscriptionModel {
         'subscriptions.unsubscribe_token',
         'repositories.last_seen_tag',
       );
-  }
-
-  // Updates last_seen_tag for the given repository.
-  async updateLastSeenTag(repo: string, tag: string): Promise<void> {
-    await knex('repositories').where({ repo }).update({ last_seen_tag: tag });
   }
 
   // Returns all confirmed subscriptions for the given email, including last seen release tag.

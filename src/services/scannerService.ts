@@ -1,7 +1,6 @@
-import cron from 'node-cron';
-import { config } from '../config/index.js';
 import type { ConfirmedSubscriptionWithToken } from '../models/subscriptionModel.js';
 import { subscriptionModel } from '../models/subscriptionModel.js';
+import { repositoryModel } from '../models/repositoryModel.js';
 import logger from '../utils/logger.js';
 import { emailService } from './emailService.js';
 import { githubService } from './githubService.js';
@@ -64,7 +63,7 @@ export class ScannerService {
         ),
       );
 
-      await subscriptionModel.updateLastSeenTag(repo, release.tag_name);
+      await repositoryModel.updateLastSeenTag(repo, release.tag_name);
     } catch (err) {
       logger.error({ err, repo }, 'Scanner: error processing repo');
     }
@@ -88,25 +87,6 @@ export class ScannerService {
     }
 
     logger.info('Scanner: release check complete');
-  }
-
-  start(): void {
-    if (!cron.validate(config.scanner.cronSchedule)) {
-      throw new Error(
-        `Invalid cron schedule: "${config.scanner.cronSchedule}". Check SCANNER_CRON_SCHEDULE in your .env file.`,
-      );
-    }
-
-    cron.schedule(config.scanner.cronSchedule, () => {
-      this.scan().catch((err: unknown) => {
-        logger.error({ err }, 'Scanner: unhandled error during scan');
-      });
-    });
-
-    logger.info(
-      { schedule: config.scanner.cronSchedule },
-      'Scanner: scheduled',
-    );
   }
 }
 

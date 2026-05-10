@@ -1,5 +1,5 @@
-import cron from 'node-cron';
 import { subscriptionModel } from '../../models/subscriptionModel.js';
+import { repositoryModel } from '../../models/repositoryModel.js';
 import { emailService } from '../emailService.js';
 import { githubService } from '../githubService.js';
 import { ScannerService } from '../scannerService.js';
@@ -8,12 +8,12 @@ jest.mock('../../db/knex.js', () => ({}));
 jest.mock('../githubService.js');
 jest.mock('../emailService.js');
 jest.mock('../../models/subscriptionModel.js');
-jest.mock('node-cron');
+jest.mock('../../models/repositoryModel.js');
 
 const mockedGithubService = jest.mocked(githubService);
 const mockedEmailService = jest.mocked(emailService);
 const mockedModel = jest.mocked(subscriptionModel);
-const mockedCron = jest.mocked(cron);
+const mockedRepositoryModel = jest.mocked(repositoryModel);
 
 const REPO_A = 'owner/repo-a';
 const REPO_B = 'owner/repo-b';
@@ -39,7 +39,7 @@ describe('ScannerService', () => {
     service = new ScannerService();
     jest.clearAllMocks();
     mockedEmailService.sendNotificationEmail.mockResolvedValue(undefined);
-    mockedModel.updateLastSeenTag.mockResolvedValue(undefined);
+    mockedRepositoryModel.updateLastSeenTag.mockResolvedValue(undefined);
   });
 
   describe('scan', () => {
@@ -108,7 +108,7 @@ describe('ScannerService', () => {
 
       await service.scan();
 
-      expect(mockedModel.updateLastSeenTag).toHaveBeenCalledWith(
+      expect(mockedRepositoryModel.updateLastSeenTag).toHaveBeenCalledWith(
         REPO_A,
         'v2.0.0',
       );
@@ -126,7 +126,7 @@ describe('ScannerService', () => {
       await service.scan();
 
       expect(mockedEmailService.sendNotificationEmail).not.toHaveBeenCalled();
-      expect(mockedModel.updateLastSeenTag).not.toHaveBeenCalled();
+      expect(mockedRepositoryModel.updateLastSeenTag).not.toHaveBeenCalled();
     });
 
     it('should not send a notification if the repository has no releases', async () => {
@@ -161,28 +161,6 @@ describe('ScannerService', () => {
         REPO_B,
         'v2.0.0',
         expect.any(String),
-      );
-    });
-  });
-
-  describe('start', () => {
-    it('should throw an Error when the cron expression is invalid', () => {
-      mockedCron.validate.mockReturnValue(false);
-
-      expect(() => service.start()).toThrow(/Invalid cron schedule/);
-    });
-
-    it('should call cron.schedule with the configured schedule when the expression is valid', () => {
-      mockedCron.validate.mockReturnValue(true);
-      mockedCron.schedule.mockReturnValue(
-        {} as ReturnType<typeof cron.schedule>,
-      );
-
-      service.start();
-
-      expect(mockedCron.schedule).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.any(Function),
       );
     });
   });
