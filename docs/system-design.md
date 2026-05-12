@@ -368,6 +368,8 @@ Confirm a subscription using the token from the confirmation email.
 | `400 Bad Request` | Invalid token format |
 | `404 Not Found` | Token not found |
 
+> **Note on HTTP semantics:** RFC 9110 requires `GET` to be safe and idempotent (no state mutation). This endpoint intentionally violates that constraint because confirmation links are opened directly by the browser from an email — there is no opportunity to use `POST` without serving an intermediate HTML page. The trade-off is accepted for simplicity at the MVP stage. A stricter alternative would be: `GET /api/confirm/:token` renders an HTML page with a "Confirm" button, which submits `POST /api/confirm/:token` to perform the actual state change.
+
 ---
 
 #### `GET /api/unsubscribe/:token`
@@ -383,6 +385,8 @@ Unsubscribe using the token from a notification email.
 | `200 OK` | Successfully unsubscribed |
 | `400 Bad Request` | Invalid token format |
 | `404 Not Found` | Token not found |
+
+> **Note on HTTP semantics:** same trade-off as `GET /api/confirm/:token` above — the unsubscribe link is embedded in notification emails and must work with a single browser `GET`. A fully RFC-compliant design would serve an HTML confirmation page first and perform the deletion via `POST`.
 
 ---
 
