@@ -11,7 +11,8 @@
 7. [Data Model](#7-data-model)
 8. [API Integration](#8-api-integration)
 9. [Observability](#9-observability)
-10. [Future Work](#10-future-work)
+10. [Testing and CI](#10-testing-and-ci)
+11. [Future Work](#11-future-work)
 
 ---
 
@@ -471,7 +472,59 @@ Every HTTP request is logged with method, URL, status code, and response time. T
 
 ---
 
-## 10. Future Work
+## 10. Testing and CI
+
+### 10.1 Test Strategy
+
+The project uses **Jest** as the test runner with **Supertest** for HTTP-layer integration tests.
+
+| Layer | Tool | Scope |
+|-------|------|-------|
+| Unit | Jest | Individual service and middleware functions in isolation |
+| Integration | Jest + Supertest | Full HTTP request/response cycle against a real test database |
+
+**Unit tests** (`src/**/__tests__/`) mock all external dependencies (database, GitHub API, SMTP) and verify business logic in isolation:
+
+| File | What is tested |
+|------|----------------|
+| `subscriptionService.test.ts` | Subscribe, confirm, unsubscribe, duplicate detection |
+| `scannerService.test.ts` | Scan cycle: grouping by repo, new release detection, notification dispatch |
+| `githubService.test.ts` | Repository existence check, latest release fetch, rate limit handling |
+| `emailService.test.ts` | Confirmation and notification email rendering and dispatch |
+| `subscriptionController.test.ts` | Request validation, error mapping to HTTP status codes |
+| `apiKeyAuth.test.ts` | Timing-safe API key comparison, missing/invalid key rejection |
+
+**Integration tests** (`tests/integration/subscription.test.ts`) spin up the full Express application and verify end-to-end HTTP flows: subscribe → confirm → receive notification → unsubscribe. All tests mock the Knex connection and service layer, so the full suite runs without any external dependencies (no real PostgreSQL required).
+
+### 10.2 CI Pipeline
+
+Implemented in `.github/workflows/ci.yml` using GitHub Actions.
+
+```mermaid
+flowchart LR
+    Trigger["Push to main\nor PR to main"]
+    Trigger --> Build["build\nnpm run build"]
+    Trigger --> Lint["lint\nnpm run lint\nnpm run format:check"]
+    Trigger --> Typecheck["typecheck\nnpm run typecheck"]
+    Trigger --> Test["test\nnpm test"]
+    Build & Lint & Typecheck & Test -->|"push to main only"| Deploy["deploy\nSSH → EC2\ngit pull · docker compose up"]
+```
+
+All four check jobs run in **parallel** on every push to `main` and every PR targeting `main`.
+
+| Job | Steps |
+|-----|-------|
+| `build` | `npm ci` → `npm run build` — verifies the TypeScript compiles without emit errors |
+| `lint` | `npm ci` → `npm run lint` → `npm run format:check` — ESLint + Prettier |
+| `typecheck` | `npm ci` → `npm run typecheck` — `tsc --noEmit` for type errors without full compilation |
+| `test` | `npm ci` → `npm test` — full Jest suite (no external services required) |
+| `deploy` | SSH into EC2 → `git pull` → `docker compose --profile production up -d --build` → prune old images |
+
+The `deploy` job runs **only on a push to `main`** (i.e. after a PR is merged) and requires all four jobs above to pass first. It never runs on PR events. Required repository secrets: `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `EC2_WORK_DIR`.
+
+---
+
+## 11. Future Work
 
 ### Duplicate Notifications Under Horizontal Scaling
 
