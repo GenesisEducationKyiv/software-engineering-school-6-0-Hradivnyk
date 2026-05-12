@@ -18,18 +18,14 @@
 
 **Release Owl** is an HTTP service that allows users to subscribe to email notifications about new releases of GitHub repositories. The service periodically polls the GitHub API and sends emails to subscribers when a new release tag is detected.
 
-```
-User → POST /api/subscribe
-                ↓
-       Repository validation (GitHub API)
-                ↓
-       Persist to PostgreSQL
-                ↓
-       Send confirmation email
-                ↓
-       User confirms subscription
-                ↓
-[cron] Scanner → GitHub API → new release? → Email notification to all subscribers
+```mermaid
+flowchart TD
+    A[User] -->|POST /api/subscribe| B[Repository validation\nGitHub API]
+    B --> C[Persist to PostgreSQL]
+    C --> D[Send confirmation email]
+    D --> E[User confirms subscription]
+    F["[cron] Scanner"] --> G[GitHub API]
+    G -->|new release?| H[Email notification to all subscribers]
 ```
 
 ---
@@ -128,66 +124,44 @@ User → POST /api/subscribe
 
 ## 5. High-Level Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        EC2 Instance                             │
-│                                                                 │
-│  ┌──────────┐   :80/:443   ┌─────────────────────────────────┐ │
-│  │  Caddy   │◄────────────►│       Node.js Process           │ │
-│  │ (TLS)    │   :3000      │                                 │ │
-│  └──────────┘              │  ┌──────────┐  ┌─────────────┐ │ │
-│                            │  │ Express  │  │ node-cron   │ │ │
-│                            │  │  HTTP    │  │  Scanner    │ │ │
-│                            │  └────┬─────┘  └──────┬──────┘ │ │
-│                            │       │               │         │ │
-│                            │  ┌────▼───────────────▼──────┐ │ │
-│                            │  │     Service Layer          │ │ │
-│                            │  │  subscriptionService       │ │ │
-│                            │  │  scannerService            │ │ │
-│                            │  │  githubService             │ │ │
-│                            │  │  emailService              │ │ │
-│                            │  └────┬───────────────────────┘ │ │
-│                            │       │                         │ │
-│                            │  ┌────▼──────┐                 │ │
-│                            │  │  Knex     │                 │ │
-│                            │  │  Models   │                 │ │
-│                            └──└────┬──────┘─────────────────┘ │
-│                                    │                           │
-│  ┌─────────────────────────────────▼───────────────────────┐  │
-│  │              PostgreSQL 16                               │  │
-│  │         (Docker container, named volume)                 │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-          │                             │
-          ▼                             ▼
-   GitHub REST API               SMTP Server
-   api.github.com                (Resend/Gmail/etc.)
+```mermaid
+flowchart TB
+    subgraph EC2["EC2 Instance"]
+        Caddy["Caddy (TLS)\n:80 / :443"]
+        App["Node.js App"]
+        PG[("PostgreSQL 16")]
+        Caddy <-->|":3000"| App
+        App --> PG
+    end
+    GitHub["GitHub REST API"]
+    SMTP["SMTP Server"]
+    App --> GitHub
+    App --> SMTP
 ```
 
 ### Subscription Flow (Happy Path)
 
-```
-Client          Express         subscriptionService    GitHub API      SMTP
-  │                │                    │                   │            │
-  │ POST /subscribe│                    │                   │            │
-  │───────────────►│                    │                   │            │
-  │                │ subscribe(email,   │                   │            │
-  │                │ repo)              │                   │            │
-  │                │───────────────────►│                   │            │
-  │                │                    │ GET /repos/{repo} │            │
-  │                │                    │──────────────────►│            │
-  │                │                    │◄──────────────────│            │
-  │                │                    │ INSERT subscription│           │
-  │                │                    │───────────────────►[DB]        │
-  │                │                    │ sendConfirmEmail  │            │
-  │                │                    │──────────────────────────────►│
-  │◄───────────────│ 200 OK             │                   │            │
-  │                │                    │                   │            │
-  │ GET /confirm/:token                 │                   │            │
-  │───────────────►│ confirm(token)     │                   │            │
-  │                │───────────────────►│                   │            │
-  │                │                    │ UPDATE status=confirmed        │
-  │◄───────────────│ 200 OK             │                   │            │
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Express
+    participant subscriptionService
+    participant GitHubAPI as GitHub API
+    participant DB
+    participant SMTP
+
+    Client->>Express: POST /subscribe
+    Express->>subscriptionService: subscribe(email, repo)
+    subscriptionService->>GitHubAPI: GET /repos/{repo}
+    GitHubAPI-->>subscriptionService: 200 OK
+    subscriptionService->>DB: INSERT subscription
+    subscriptionService->>SMTP: sendConfirmEmail
+    Express-->>Client: 200 OK
+
+    Client->>Express: GET /confirm/:token
+    Express->>subscriptionService: confirm(token)
+    subscriptionService->>DB: UPDATE status=confirmed
+    Express-->>Client: 200 OK
 ```
 
 ---
@@ -307,17 +281,21 @@ CREATE TABLE subscriptions (
 
 ### ER Diagram
 
-```
-┌───────────────────────┐         ┌──────────────────────────────┐
-│     repositories      │         │        subscriptions         │
-├───────────────────────┤         ├──────────────────────────────┤
-│ repo (PK)     TEXT    │◄───────│ id            UUID (PK)      │
-│ last_seen_tag TEXT    │  1:N    │ email         TEXT           │
-└───────────────────────┘         │ repo (FK)     TEXT           │
-                                  │ confirm_token TEXT (UNIQUE)  │
-                                  │ unsubscribe_token TEXT (UNIQ)│
-                                  │ status        TEXT           │
-                                  └──────────────────────────────┘
+```mermaid
+erDiagram
+    repositories {
+        TEXT repo PK
+        TEXT last_seen_tag
+    }
+    subscriptions {
+        UUID id PK
+        TEXT email
+        TEXT repo FK
+        TEXT confirm_token "UNIQUE"
+        TEXT unsubscribe_token "UNIQUE"
+        TEXT status
+    }
+    repositories ||--o{ subscriptions : "has"
 ```
 
 ### Migrations
@@ -488,13 +466,11 @@ CREATE TABLE scanner_leader (
 
 Move the scan cycle into a standalone service/container (`scanner-worker`) that is always deployed as a single instance (`replicas: 1` in Docker Compose / Kubernetes Deployment). The HTTP server scales horizontally and independently.
 
-```
-                  ┌─────────────────────┐
-   Load Balancer  │  api (replicas: N)  │  ← horizontally scaled
-                  └─────────────────────┘
-                  ┌─────────────────────┐
-                  │ scanner (replicas:1)│  ← always a single instance
-                  └─────────────────────┘
+```mermaid
+flowchart TB
+    LB[Load Balancer]
+    LB --> API["api (replicas: N)\nhorizontally scaled"]
+    Scanner["scanner (replicas: 1)\nalways a single instance"]
 ```
 
 **Pros:** architecturally clean separation of concerns; eliminates the duplication problem without any lock mechanisms.  
