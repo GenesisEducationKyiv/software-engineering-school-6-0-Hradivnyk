@@ -10,7 +10,8 @@
 6. [Detailed Component Design](#6-detailed-component-design)
 7. [Data Model](#7-data-model)
 8. [API Integration](#8-api-integration)
-9. [Future Work](#9-future-work)
+9. [Observability](#9-observability)
+10. [Future Work](#10-future-work)
 
 ---
 
@@ -427,7 +428,50 @@ Nodemailer over standard SMTP. Compatible with any SMTP provider:
 
 ---
 
-## 9. Future Work
+## 9. Observability
+
+### 9.1 Logging (current)
+
+Structured JSON logging is implemented via **Pino** with `pino-http` for HTTP request logging.
+
+| Level | When used |
+|-------|-----------|
+| `DEBUG` | Verbose internal details (disabled in production) |
+| `INFO` | Successful operations: subscription created, email sent, scan completed |
+| `ERROR` | Failures: GitHub API errors, SMTP errors, unexpected exceptions |
+
+Every HTTP request is logged with method, URL, status code, and response time. The scanner logs each cycle: repositories checked, new releases found, emails sent.
+
+### 9.2 Metrics (planned)
+
+> Not yet implemented. Planned for a future course milestone.
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `http_requests_total` | Counter | Total HTTP requests by method, route, status |
+| `http_request_duration_ms` | Histogram | P50/P95/P99 response times |
+| `scanner_cycle_duration_ms` | Histogram | Duration of each full scan cycle |
+| `scanner_repos_checked_total` | Counter | Repositories checked per cycle |
+| `scanner_notifications_sent_total` | Counter | Notification emails sent per cycle |
+| `github_api_errors_total` | Counter | GitHub API failures by error type |
+| `smtp_errors_total` | Counter | SMTP delivery failures |
+
+**Planned stack:** Prometheus exposition format via `prom-client`, scraped by a Prometheus instance, visualised in Grafana.
+
+### 9.3 Alerting (planned)
+
+> Not yet implemented.
+
+| Alert | Condition |
+|-------|-----------|
+| Service down | No successful HTTP responses for > 2 min |
+| Scanner stalled | No scan cycle completed within 2× cron interval |
+| GitHub rate limit | `github_api_errors_total{type="rate_limit"}` > 0 |
+| High error rate | HTTP 5xx rate > 1% over 5 min |
+
+---
+
+## 10. Future Work
 
 ### Duplicate Notifications Under Horizontal Scaling
 
