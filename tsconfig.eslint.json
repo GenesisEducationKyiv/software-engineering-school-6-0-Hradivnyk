@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "types": ["jest", "node"]
+  },
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "jest.config.cjs",
+    "*.config.ts",
+    "knexfile.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

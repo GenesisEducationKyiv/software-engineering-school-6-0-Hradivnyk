@@ -1,127 +1,152 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GitHub Release Subscriptions</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitHub Release Subscriptions</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
 
-    body {
-      font-family: sans-serif;
-      background: #f5f5f5;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-    }
+      body {
+        font-family: sans-serif;
+        background: #f5f5f5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
 
-    .card {
-      background: #fff;
-      border-radius: 8px;
-      padding: 2rem;
-      width: 100%;
-      max-width: 400px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.1);
-    }
+      .card {
+        background: #fff;
+        border-radius: 8px;
+        padding: 2rem;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
 
-    h1 { font-size: 1.25rem; margin-bottom: .25rem; }
-    p  { font-size: .875rem; color: #666; margin-bottom: 1.5rem; }
+      h1 {
+        font-size: 1.25rem;
+        margin-bottom: 0.25rem;
+      }
+      p {
+        font-size: 0.875rem;
+        color: #666;
+        margin-bottom: 1.5rem;
+      }
 
-    label { display: block; font-size: .875rem; margin-bottom: .25rem; }
+      label {
+        display: block;
+        font-size: 0.875rem;
+        margin-bottom: 0.25rem;
+      }
 
-    input {
-      display: block;
-      width: 100%;
-      padding: .5rem .75rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 1rem;
-      margin-bottom: 1rem;
-    }
+      input {
+        display: block;
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 1rem;
+        margin-bottom: 1rem;
+      }
 
-    input:focus { outline: none; border-color: #333; }
+      input:focus {
+        outline: none;
+        border-color: #333;
+      }
 
-    button {
-      width: 100%;
-      padding: .6rem;
-      background: #222;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      font-size: 1rem;
-      cursor: pointer;
-    }
+      button {
+        width: 100%;
+        padding: 0.6rem;
+        background: #222;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+      }
 
-    button:hover { background: #444; }
+      button:hover {
+        background: #444;
+      }
 
-    #msg {
-      margin-top: 1rem;
-      font-size: .875rem;
-      text-align: center;
-    }
+      #msg {
+        margin-top: 1rem;
+        font-size: 0.875rem;
+        text-align: center;
+      }
 
-    #msg.ok  { color: #2a7a2a; }
-    #msg.err { color: #c0392b; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>Subscribe to GitHub Releases</h1>
-    <p>Get an email whenever a new release is published.</p>
+      #msg.ok {
+        color: #2a7a2a;
+      }
+      #msg.err {
+        color: #c0392b;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Subscribe to GitHub Releases</h1>
+      <p>Get an email whenever a new release is published.</p>
 
-    <form id="form">
-      <label for="repo">Repository (owner/repo)</label>
-      <input id="repo" type="text" placeholder="e.g. golang/go" required />
+      <form id="form">
+        <label for="repo">Repository (owner/repo)</label>
+        <input id="repo" type="text" placeholder="e.g. golang/go" required />
 
-      <label for="email">Email</label>
-      <input id="email" type="email" placeholder="you@example.com" required />
+        <label for="email">Email</label>
+        <input id="email" type="email" placeholder="you@example.com" required />
 
-      <label for="apiKey">API Key</label>
-      <input id="apiKey" type="text" placeholder="X-API-Key" />
+        <label for="apiKey">API Key</label>
+        <input id="apiKey" type="text" placeholder="X-API-Key" />
 
-      <button type="submit">Subscribe</button>
-    </form>
+        <button type="submit">Subscribe</button>
+      </form>
 
-    <div id="msg"></div>
-  </div>
+      <div id="msg"></div>
+    </div>
 
-  <script>
-    document.getElementById('form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const msg = document.getElementById('msg');
-      msg.textContent = '';
-      msg.className = '';
+    <script>
+      document.getElementById('form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById('msg');
+        msg.textContent = '';
+        msg.className = '';
 
-      try {
-        const apiKey = document.getElementById('apiKey').value.trim();
-        const headers = { 'Content-Type': 'application/json' };
-        if (apiKey) headers['X-API-Key'] = apiKey;
+        try {
+          const apiKey = document.getElementById('apiKey').value.trim();
+          const headers = { 'Content-Type': 'application/json' };
+          if (apiKey) headers['X-API-Key'] = apiKey;
 
-        const res = await fetch('/api/subscribe', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            repo:  document.getElementById('repo').value.trim(),
-            email: document.getElementById('email').value.trim(),
-          }),
-        });
+          const res = await fetch('/api/subscribe', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              repo: document.getElementById('repo').value.trim(),
+              email: document.getElementById('email').value.trim(),
+            }),
+          });
 
-        const data = await res.json().catch(() => ({}));
+          const data = await res.json().catch(() => ({}));
 
-        if (res.ok) {
-          msg.textContent = data.message ?? 'Check your email to confirm the subscription.';
-          msg.className = 'ok';
-          e.target.reset();
-        } else {
-          msg.textContent = data.error ?? 'Something went wrong.';
+          if (res.ok) {
+            msg.textContent =
+              data.message ?? 'Check your email to confirm the subscription.';
+            msg.className = 'ok';
+            e.target.reset();
+          } else {
+            msg.textContent = data.error ?? 'Something went wrong.';
+            msg.className = 'err';
+          }
+        } catch {
+          msg.textContent = 'Network error. Please try again.';
           msg.className = 'err';
         }
-      } catch {
-        msg.textContent = 'Network error. Please try again.';
-        msg.className = 'err';
-      }
-    });
-  </script>
-</body>
+      });
+    </script>
+  </body>
 </html>
