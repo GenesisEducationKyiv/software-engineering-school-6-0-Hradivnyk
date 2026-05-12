@@ -22,12 +22,19 @@
 
 ```mermaid
 flowchart TD
-    A[User] -->|POST /api/subscribe| B[Repository validation\nGitHub API]
-    B --> C[Persist to PostgreSQL]
-    C --> D[Send confirmation email]
-    D --> E[User confirms subscription]
-    F["[cron] Scanner"] --> G[GitHub API]
-    G -->|new release?| H[Email notification to all subscribers]
+    subgraph Sub["Subscription Flow (on demand)"]
+        A[User] -->|POST /api/subscribe| B[Repository validation\nGitHub API]
+        B --> C[Persist to PostgreSQL]
+        C --> D[Send confirmation email]
+        D --> E[User confirms subscription]
+    end
+
+    subgraph Scan["Scanner Flow (scheduled, every hour)"]
+        F["[cron] Scheduler"] --> G[Fetch all confirmed subscriptions]
+        G --> H[GitHub API — check latest release]
+        H -->|new release detected| I[Email notification to all subscribers]
+        H -->|no new release| J[Skip]
+    end
 ```
 
 ---
@@ -222,10 +229,15 @@ Thin wrapper around GitHub REST API v2022-11-28:
 
 | Method | Endpoint | Behavior |
 |--------|----------|----------|
-| `repositoryExists(repo)` | `GET /repos/{owner}/{repo}` | `200` → true, `404` → false, `429` → throw `GitHubRateLimitError` |
-| `getLatestRelease(repo)` | `GET /repos/{owner}/{repo}/releases/latest` | `200` → `{tag_name, html_url}`, `404` → null (no releases), `429` → throw |
+| `repositoryExists(repo)` | `GET /repos/{owner}/{repo}` | `200` → true, `404` → false, `429`/`403` → throw `GitHubRateLimitError` |
+| `getLatestRelease(repo)` | `GET /repos/{owner}/{repo}/releases/latest` | `200` → `{tag_name, html_url}`, `404` → null (no releases), `429`/`403` → throw |
 
-**Rate limit handling:** on status 429, reads the `X-RateLimit-Reset` header and throws `GitHubRateLimitError` with `resetAt: Date`. Without `GITHUB_TOKEN` — 60 req/hour; with token — 5,000 req/hour.
+**Rate limit handling:** both primary and secondary rate limits can return either `403` or `429`. The `handleRateLimit` method determines `resetAt` using the following priority (per GitHub docs):
+1. `Retry-After` header (seconds) — present on secondary rate limit responses; takes priority.
+2. `X-RateLimit-Reset` header (Unix seconds) — present when the primary rate limit is exhausted.
+3. Fallback: `now + 60 s`.
+
+Without `GITHUB_TOKEN` — 60 req/hour; with token — 5,000 req/hour.
 
 ### 6.5 Email Service (Nodemailer)
 
