@@ -43,35 +43,35 @@ flowchart TD
 
 ### 2.1 Functional Requirements
 
-| # | Requirement |
-|---|-------------|
-| F-01 | A user can subscribe to notifications by providing an email and an `owner/repo` slug |
+| #    | Requirement                                                                                          |
+| ---- | ---------------------------------------------------------------------------------------------------- |
+| F-01 | A user can subscribe to notifications by providing an email and an `owner/repo` slug                 |
 | F-02 | The system validates repository existence via the GitHub REST API before persisting the subscription |
-| F-03 | A subscription is activated only after email confirmation (double opt-in) |
-| F-04 | The system sends a confirmation email with a verification link after a subscription is registered |
-| F-05 | The system sends email notifications to all confirmed subscribers when a new release is detected |
-| F-06 | Every notification email contains an unsubscribe link with a one-time token |
-| F-07 | A user can unsubscribe at any time by following their unique unsubscribe link |
-| F-08 | The system exposes an API to list all active subscriptions for a given email |
-| F-09 | The `(email, repo)` pair is unique — a duplicate subscription returns 409 |
-| F-10 | A static landing page allows subscribing without calling the API directly |
-| F-11 | Swagger UI is available at `/api/docs` for interactive API testing |
+| F-03 | A subscription is activated only after email confirmation (double opt-in)                            |
+| F-04 | The system sends a confirmation email with a verification link after a subscription is registered    |
+| F-05 | The system sends email notifications to all confirmed subscribers when a new release is detected     |
+| F-06 | Every notification email contains an unsubscribe link with a one-time token                          |
+| F-07 | A user can unsubscribe at any time by following their unique unsubscribe link                        |
+| F-08 | The system exposes an API to list all active subscriptions for a given email                         |
+| F-09 | The `(email, repo)` pair is unique — a duplicate subscription returns 409                            |
+| F-10 | A static landing page allows subscribing without calling the API directly                            |
+| F-11 | Swagger UI is available at `/api/docs` for interactive API testing                                   |
 
 ### 2.2 Non-Functional Requirements
 
-| Category | Requirement | Target |
-|----------|-------------|--------|
-| **Availability** | Service uptime | ≥ 99% (single-instance EC2) |
-| **Latency** | P95 response time for API requests | < 500 ms (excluding GitHub API latency) |
-| **Scalability** | Number of monitored repositories | Up to 1,000 without architectural changes |
-| **Reliability** | Single email send failure | Does not stop processing other subscribers (`Promise.allSettled`) |
-| **Reliability** | Scanner crash | Does not affect HTTP request handling (graceful logging) |
-| **Security** | Brute-force protection | Rate limiting: 100 req / 15 min / IP |
-| **Security** | API endpoint protection | Optional `X-API-Key` with timing-safe comparison |
-| **Security** | Transport | TLS via Caddy (Let's Encrypt) in production |
-| **Configurability** | Start without required env variables | Fail-fast on startup |
-| **Maintainability** | Structured JSON logging | Pino, DEBUG/INFO/ERROR levels |
-| **Testability** | Unit + integration test coverage | Jest + Supertest |
+| Category            | Requirement                          | Target                                                            |
+| ------------------- | ------------------------------------ | ----------------------------------------------------------------- |
+| **Availability**    | Service uptime                       | ≥ 99% (single-instance EC2)                                       |
+| **Latency**         | P95 response time for API requests   | < 500 ms (excluding GitHub API latency)                           |
+| **Scalability**     | Number of monitored repositories     | Up to 1,000 without architectural changes                         |
+| **Reliability**     | Single email send failure            | Does not stop processing other subscribers (`Promise.allSettled`) |
+| **Reliability**     | Scanner crash                        | Does not affect HTTP request handling (graceful logging)          |
+| **Security**        | Brute-force protection               | Rate limiting: 100 req / 15 min / IP                              |
+| **Security**        | API endpoint protection              | Optional `X-API-Key` with timing-safe comparison                  |
+| **Security**        | Transport                            | TLS via Caddy (Let's Encrypt) in production                       |
+| **Configurability** | Start without required env variables | Fail-fast on startup                                              |
+| **Maintainability** | Structured JSON logging              | Pino, DEBUG/INFO/ERROR levels                                     |
+| **Testability**     | Unit + integration test coverage     | Jest + Supertest                                                  |
 
 ---
 
@@ -101,33 +101,33 @@ flowchart TD
 
 ### 4.1 Users and Traffic
 
-| Metric | Estimate | Note |
-|--------|----------|------|
-| Active subscribers | ~1,000 | MVP target audience |
-| Unique repositories | ~300 | Some subscribers follow the same repo |
-| New subscriptions / day | ~20 | `POST /api/subscribe` |
-| Confirmations / day | ~18 | ~90% conversion rate |
-| Subscription lookups / day | ~10 | `GET /api/subscriptions` |
-| GitHub API requests / hour | ~300 | 1 request × 300 repos × 1 time/hour |
-| Email notifications / hour | ~50 | ~5% of repos having a new release per hour |
+| Metric                     | Estimate | Note                                       |
+| -------------------------- | -------- | ------------------------------------------ |
+| Active subscribers         | ~1,000   | MVP target audience                        |
+| Unique repositories        | ~300     | Some subscribers follow the same repo      |
+| New subscriptions / day    | ~20      | `POST /api/subscribe`                      |
+| Confirmations / day        | ~18      | ~90% conversion rate                       |
+| Subscription lookups / day | ~10      | `GET /api/subscriptions`                   |
+| GitHub API requests / hour | ~300     | 1 request × 300 repos × 1 time/hour        |
+| Email notifications / hour | ~50      | ~5% of repos having a new release per hour |
 
 ### 4.2 Data
 
-| Table | Row size (estimate) | Rows | Volume |
-|-------|---------------------|------|--------|
-| `repositories` | ~100 bytes | 300 | ~30 KB |
-| `subscriptions` | ~300 bytes | 1,000 | ~300 KB |
+| Table           | Row size (estimate) | Rows  | Volume  |
+| --------------- | ------------------- | ----- | ------- |
+| `repositories`  | ~100 bytes          | 300   | ~30 KB  |
+| `subscriptions` | ~300 bytes          | 1,000 | ~300 KB |
 
 **Growth:** +20 subscriptions/day = 6 KB/day → **2 MB/year**. PostgreSQL thresholds are not a concern at any realistic volume.
 
 ### 4.3 Bandwidth
 
-| Direction | Estimate | Calculation |
-|-----------|----------|-------------|
-| Inbound HTTP traffic | ~5 KB/hour | ~20 req × ~250 bytes/req |
-| Outbound to GitHub API | ~90 KB/hour | 300 req × ~300 bytes response |
-| Outbound email notifications | ~50 KB/hour | 50 emails × ~1 KB/email |
-| **Total** | **< 200 KB/hour** | Not a bottleneck |
+| Direction                    | Estimate          | Calculation                   |
+| ---------------------------- | ----------------- | ----------------------------- |
+| Inbound HTTP traffic         | ~5 KB/hour        | ~20 req × ~250 bytes/req      |
+| Outbound to GitHub API       | ~90 KB/hour       | 300 req × ~300 bytes response |
+| Outbound email notifications | ~50 KB/hour       | 50 emails × ~1 KB/email       |
+| **Total**                    | **< 200 KB/hour** | Not a bottleneck              |
 
 ---
 
@@ -204,12 +204,12 @@ errorHandler()                  → centralized error handling
 
 Coordinates the full subscription lifecycle:
 
-| Method | Action |
-|--------|--------|
-| `subscribe(email, repo)` | Validates repo → checks for duplicate → generates tokens (`crypto.randomBytes(32)`) → persists → sends confirmation email |
-| `confirm(token)` | Validates token format (hex 64) → updates status to `confirmed` |
-| `unsubscribe(token)` | Validates format → deletes the subscription row |
-| `getSubscriptions(email)` | Returns all subscriptions for the given email |
+| Method                    | Action                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `subscribe(email, repo)`  | Validates repo → checks for duplicate → generates tokens (`crypto.randomBytes(32)`) → persists → sends confirmation email |
+| `confirm(token)`          | Validates token format (hex 64) → updates status to `confirmed`                                                           |
+| `unsubscribe(token)`      | Validates format → deletes the subscription row                                                                           |
+| `getSubscriptions(email)` | Returns all subscriptions for the given email                                                                             |
 
 ### 6.3 Scanner Service
 
@@ -227,12 +227,13 @@ Cron job with a configurable schedule (`SCANNER_CRON_SCHEDULE`, default: `0 * * 
 
 Thin wrapper around GitHub REST API v2022-11-28:
 
-| Method | Endpoint | Behavior |
-|--------|----------|----------|
-| `repositoryExists(repo)` | `GET /repos/{owner}/{repo}` | `200` → true, `404` → false, `429`/`403` → throw `GitHubRateLimitError` |
+| Method                   | Endpoint                                    | Behavior                                                                        |
+| ------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------- |
+| `repositoryExists(repo)` | `GET /repos/{owner}/{repo}`                 | `200` → true, `404` → false, `429`/`403` → throw `GitHubRateLimitError`         |
 | `getLatestRelease(repo)` | `GET /repos/{owner}/{repo}/releases/latest` | `200` → `{tag_name, html_url}`, `404` → null (no releases), `429`/`403` → throw |
 
 **Rate limit handling:** both primary and secondary rate limits can return either `403` or `429`. The `handleRateLimit` method determines `resetAt` using the following priority (per GitHub docs):
+
 1. `Retry-After` header (seconds) — present on secondary rate limit responses; takes priority.
 2. `X-RateLimit-Reset` header (Unix seconds) — present when the primary rate limit is exhausted.
 3. Fallback: `now + 60 s`.
@@ -243,9 +244,9 @@ Without `GITHUB_TOKEN` — 60 req/hour; with token — 5,000 req/hour.
 
 Uses SMTP transport. Two email types:
 
-| Type | Subject | Content |
-|------|---------|---------|
-| Confirmation | `Confirm your subscription` | Link `{BASE_URL}/api/confirm/{token}` |
+| Type         | Subject                     | Content                                                              |
+| ------------ | --------------------------- | -------------------------------------------------------------------- |
+| Confirmation | `Confirm your subscription` | Link `{BASE_URL}/api/confirm/{token}`                                |
 | Notification | `New release: {repo} {tag}` | Release link + unsubscribe link `{BASE_URL}/api/unsubscribe/{token}` |
 
 ### 6.6 Config Module
@@ -338,19 +339,20 @@ node dist/index.js     # start the service
 Subscribe to release notifications for a repository.
 
 **Request:**
+
 ```json
 { "email": "user@example.com", "repo": "golang/go" }
 ```
 
 **Responses:**
 
-| Status | Description |
-|--------|-------------|
-| `200 OK` | Subscription created, confirmation email sent |
-| `400 Bad Request` | Invalid email or repo format |
-| `401 Unauthorized` | Missing or invalid API key |
-| `404 Not Found` | Repository not found on GitHub |
-| `409 Conflict` | This email is already subscribed to this repository |
+| Status             | Description                                         |
+| ------------------ | --------------------------------------------------- |
+| `200 OK`           | Subscription created, confirmation email sent       |
+| `400 Bad Request`  | Invalid email or repo format                        |
+| `401 Unauthorized` | Missing or invalid API key                          |
+| `404 Not Found`    | Repository not found on GitHub                      |
+| `409 Conflict`     | This email is already subscribed to this repository |
 
 ---
 
@@ -362,11 +364,11 @@ Confirm a subscription using the token from the confirmation email.
 
 **Responses:**
 
-| Status | Description |
-|--------|-------------|
-| `200 OK` | Subscription confirmed |
-| `400 Bad Request` | Invalid token format |
-| `404 Not Found` | Token not found |
+| Status            | Description            |
+| ----------------- | ---------------------- |
+| `200 OK`          | Subscription confirmed |
+| `400 Bad Request` | Invalid token format   |
+| `404 Not Found`   | Token not found        |
 
 > **Note on HTTP semantics:** RFC 9110 requires `GET` to be safe and idempotent (no state mutation). This endpoint intentionally violates that constraint because confirmation links are opened directly by the browser from an email — there is no opportunity to use `POST` without serving an intermediate HTML page. The trade-off is accepted for simplicity at the MVP stage. A stricter alternative would be: `GET /api/confirm/:token` renders an HTML page with a "Confirm" button, which submits `POST /api/confirm/:token` to perform the actual state change.
 
@@ -380,11 +382,11 @@ Unsubscribe using the token from a notification email.
 
 **Responses:**
 
-| Status | Description |
-|--------|-------------|
-| `200 OK` | Successfully unsubscribed |
-| `400 Bad Request` | Invalid token format |
-| `404 Not Found` | Token not found |
+| Status            | Description               |
+| ----------------- | ------------------------- |
+| `200 OK`          | Successfully unsubscribed |
+| `400 Bad Request` | Invalid token format      |
+| `404 Not Found`   | Token not found           |
 
 > **Note on HTTP semantics:** same trade-off as `GET /api/confirm/:token` above — the unsubscribe link is embedded in notification emails and must work with a single browser `GET`. A fully RFC-compliant design would serve an HTML confirmation page first and perform the deletion via `POST`.
 
@@ -397,6 +399,7 @@ Get all active subscriptions for an email address.
 **Query param:** `email` — email address
 
 **Response `200`:**
+
 ```json
 [
   {
@@ -412,12 +415,13 @@ Get all active subscriptions for an email address.
 
 ### 8.2 GitHub REST API Integration
 
-| Purpose | Endpoint | Method |
-|---------|----------|--------|
-| Check repository existence | `https://api.github.com/repos/{owner}/{repo}` | GET |
-| Get latest release | `https://api.github.com/repos/{owner}/{repo}/releases/latest` | GET |
+| Purpose                    | Endpoint                                                      | Method |
+| -------------------------- | ------------------------------------------------------------- | ------ |
+| Check repository existence | `https://api.github.com/repos/{owner}/{repo}`                 | GET    |
+| Get latest release         | `https://api.github.com/repos/{owner}/{repo}/releases/latest` | GET    |
 
 **Headers:**
+
 ```
 Accept: application/vnd.github+json
 X-GitHub-Api-Version: 2022-11-28
@@ -426,10 +430,10 @@ Authorization: Bearer {GITHUB_TOKEN}   (optional)
 
 **Rate limits:**
 
-| Mode | Limit |
-|------|-------|
-| Without token | 60 req/hour (per IP) |
-| With `GITHUB_TOKEN` | 5,000 req/hour |
+| Mode                | Limit                |
+| ------------------- | -------------------- |
+| Without token       | 60 req/hour (per IP) |
+| With `GITHUB_TOKEN` | 5,000 req/hour       |
 
 When the rate limit is exceeded (status 429), the service throws `GitHubRateLimitError` and logs the reset time from `X-RateLimit-Reset`.
 
@@ -437,11 +441,11 @@ When the rate limit is exceeded (status 429), the service throws `GitHubRateLimi
 
 Nodemailer over standard SMTP. Compatible with any SMTP provider:
 
-| Provider | SMTP_HOST | SMTP_PORT |
-|----------|-----------|-----------|
-| Gmail | `smtp.gmail.com` | `587` |
-| Resend | `smtp.resend.com` | `465` |
-| Mailgun | `smtp.mailgun.org` | `587` |
+| Provider | SMTP_HOST          | SMTP_PORT |
+| -------- | ------------------ | --------- |
+| Gmail    | `smtp.gmail.com`   | `587`     |
+| Resend   | `smtp.resend.com`  | `465`     |
+| Mailgun  | `smtp.mailgun.org` | `587`     |
 
 ---
 
@@ -451,11 +455,11 @@ Nodemailer over standard SMTP. Compatible with any SMTP provider:
 
 Structured JSON logging is implemented via **Pino** with `pino-http` for HTTP request logging.
 
-| Level | When used |
-|-------|-----------|
-| `DEBUG` | Verbose internal details (disabled in production) |
-| `INFO` | Successful operations: subscription created, email sent, scan completed |
-| `ERROR` | Failures: GitHub API errors, SMTP errors, unexpected exceptions |
+| Level   | When used                                                               |
+| ------- | ----------------------------------------------------------------------- |
+| `DEBUG` | Verbose internal details (disabled in production)                       |
+| `INFO`  | Successful operations: subscription created, email sent, scan completed |
+| `ERROR` | Failures: GitHub API errors, SMTP errors, unexpected exceptions         |
 
 Every HTTP request is logged with method, URL, status code, and response time. The scanner logs each cycle: repositories checked, new releases found, emails sent.
 
@@ -463,15 +467,15 @@ Every HTTP request is logged with method, URL, status code, and response time. T
 
 > Not yet implemented. Planned for a future course milestone.
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `http_requests_total` | Counter | Total HTTP requests by method, route, status |
-| `http_request_duration_ms` | Histogram | P50/P95/P99 response times |
-| `scanner_cycle_duration_ms` | Histogram | Duration of each full scan cycle |
-| `scanner_repos_checked_total` | Counter | Repositories checked per cycle |
-| `scanner_notifications_sent_total` | Counter | Notification emails sent per cycle |
-| `github_api_errors_total` | Counter | GitHub API failures by error type |
-| `smtp_errors_total` | Counter | SMTP delivery failures |
+| Metric                             | Type      | Description                                  |
+| ---------------------------------- | --------- | -------------------------------------------- |
+| `http_requests_total`              | Counter   | Total HTTP requests by method, route, status |
+| `http_request_duration_ms`         | Histogram | P50/P95/P99 response times                   |
+| `scanner_cycle_duration_ms`        | Histogram | Duration of each full scan cycle             |
+| `scanner_repos_checked_total`      | Counter   | Repositories checked per cycle               |
+| `scanner_notifications_sent_total` | Counter   | Notification emails sent per cycle           |
+| `github_api_errors_total`          | Counter   | GitHub API failures by error type            |
+| `smtp_errors_total`                | Counter   | SMTP delivery failures                       |
 
 **Planned stack:** Prometheus exposition format via `prom-client`, scraped by a Prometheus instance, visualised in Grafana.
 
@@ -479,12 +483,12 @@ Every HTTP request is logged with method, URL, status code, and response time. T
 
 > Not yet implemented.
 
-| Alert | Condition |
-|-------|-----------|
-| Service down | No successful HTTP responses for > 2 min |
-| Scanner stalled | No scan cycle completed within 2× cron interval |
+| Alert             | Condition                                        |
+| ----------------- | ------------------------------------------------ |
+| Service down      | No successful HTTP responses for > 2 min         |
+| Scanner stalled   | No scan cycle completed within 2× cron interval  |
 | GitHub rate limit | `github_api_errors_total{type="rate_limit"}` > 0 |
-| High error rate | HTTP 5xx rate > 1% over 5 min |
+| High error rate   | HTTP 5xx rate > 1% over 5 min                    |
 
 ---
 
@@ -494,21 +498,21 @@ Every HTTP request is logged with method, URL, status code, and response time. T
 
 The project uses **Jest** as the test runner with **Supertest** for HTTP-layer integration tests.
 
-| Layer | Tool | Scope |
-|-------|------|-------|
-| Unit | Jest | Individual service and middleware functions in isolation |
+| Layer       | Tool             | Scope                                                         |
+| ----------- | ---------------- | ------------------------------------------------------------- |
+| Unit        | Jest             | Individual service and middleware functions in isolation      |
 | Integration | Jest + Supertest | Full HTTP request/response cycle against a real test database |
 
 **Unit tests** (`src/**/__tests__/`) mock all external dependencies (database, GitHub API, SMTP) and verify business logic in isolation:
 
-| File | What is tested |
-|------|----------------|
-| `subscriptionService.test.ts` | Subscribe, confirm, unsubscribe, duplicate detection |
-| `scannerService.test.ts` | Scan cycle: grouping by repo, new release detection, notification dispatch |
-| `githubService.test.ts` | Repository existence check, latest release fetch, rate limit handling |
-| `emailService.test.ts` | Confirmation and notification email rendering and dispatch |
-| `subscriptionController.test.ts` | Request validation, error mapping to HTTP status codes |
-| `apiKeyAuth.test.ts` | Timing-safe API key comparison, missing/invalid key rejection |
+| File                             | What is tested                                                             |
+| -------------------------------- | -------------------------------------------------------------------------- |
+| `subscriptionService.test.ts`    | Subscribe, confirm, unsubscribe, duplicate detection                       |
+| `scannerService.test.ts`         | Scan cycle: grouping by repo, new release detection, notification dispatch |
+| `githubService.test.ts`          | Repository existence check, latest release fetch, rate limit handling      |
+| `emailService.test.ts`           | Confirmation and notification email rendering and dispatch                 |
+| `subscriptionController.test.ts` | Request validation, error mapping to HTTP status codes                     |
+| `apiKeyAuth.test.ts`             | Timing-safe API key comparison, missing/invalid key rejection              |
 
 **Integration tests** (`tests/integration/subscription.test.ts`) spin up the full Express application and verify end-to-end HTTP flows: subscribe → confirm → receive notification → unsubscribe. All tests mock the Knex connection and service layer, so the full suite runs without any external dependencies (no real PostgreSQL required).
 
@@ -528,13 +532,13 @@ flowchart LR
 
 All four check jobs run in **parallel** on every push to `main` and every PR targeting `main`.
 
-| Job | Steps |
-|-----|-------|
-| `build` | `npm ci` → `npm run build` — verifies the TypeScript compiles without emit errors |
-| `lint` | `npm ci` → `npm run lint` → `npm run format:check` — ESLint + Prettier |
-| `typecheck` | `npm ci` → `npm run typecheck` — `tsc --noEmit` for type errors without full compilation |
-| `test` | `npm ci` → `npm test` — full Jest suite (no external services required) |
-| `deploy` | SSH into EC2 → `git pull` → `docker compose --profile production up -d --build` → prune old images |
+| Job         | Steps                                                                                              |
+| ----------- | -------------------------------------------------------------------------------------------------- |
+| `build`     | `npm ci` → `npm run build` — verifies the TypeScript compiles without emit errors                  |
+| `lint`      | `npm ci` → `npm run lint` → `npm run format:check` — ESLint + Prettier                             |
+| `typecheck` | `npm ci` → `npm run typecheck` — `tsc --noEmit` for type errors without full compilation           |
+| `test`      | `npm ci` → `npm test` — full Jest suite (no external services required)                            |
+| `deploy`    | SSH into EC2 → `git pull` → `docker compose --profile production up -d --build` → prune old images |
 
 The `deploy` job runs **only on a push to `main`** (i.e. after a PR is merged) and requires all four jobs above to pass first. It never runs on PR events. Required repository secrets: `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `EC2_WORK_DIR`.
 
@@ -613,11 +617,11 @@ flowchart LR
 
 **Queue options:**
 
-| Option | Infrastructure | Notes |
-|--------|---------------|-------|
-| BullMQ + Redis | Redis instance | Good fit for Node.js; supports retries, delays, concurrency limits |
-| PostgreSQL SKIP LOCKED | No new infra | Uses `SELECT … FOR UPDATE SKIP LOCKED`; works well at moderate scale |
-| AWS SQS | Managed AWS | Natural fit if already on AWS; visibility timeout built-in |
+| Option                 | Infrastructure | Notes                                                                |
+| ---------------------- | -------------- | -------------------------------------------------------------------- |
+| BullMQ + Redis         | Redis instance | Good fit for Node.js; supports retries, delays, concurrency limits   |
+| PostgreSQL SKIP LOCKED | No new infra   | Uses `SELECT … FOR UPDATE SKIP LOCKED`; works well at moderate scale |
+| AWS SQS                | Managed AWS    | Natural fit if already on AWS; visibility timeout built-in           |
 
 **Pros:** true horizontal scalability — add workers to increase throughput linearly; overlap-safe by design; built-in retries on worker crash.  
 **Cons:** introduces a new infrastructure component (queue broker); significantly more complex than Options 1–3.
