@@ -587,8 +587,41 @@ flowchart TB
 ```
 
 **Pros:** architecturally clean separation of concerns; eliminates the duplication problem without any lock mechanisms.  
-**Cons:** requires refactoring the deployment and a separate Docker image or entrypoint.
+**Cons:** requires refactoring the deployment and a separate Docker image or entrypoint. Still a single-threaded bottleneck — does not scale beyond one worker and does not protect against job overlap (a slow scan cycle can still be overtaken by the next cron tick).
+
+#### Option 4 — Distributed Work Queue
+
+Addresses two problems that Options 1–3 do not solve simultaneously: **safe parallel execution** across multiple workers and **job overlap prevention** when a scan cycle exceeds the cron interval.
+
+**How it works:**
+
+1. A lightweight cron process runs on a single instance and only **enqueues one job per repository** into a shared queue on each tick — it performs no GitHub API calls itself.
+2. A pool of **N stateless scanner workers** dequeue and process jobs independently, each making exactly one GitHub API request per job.
+3. Jobs have a **visibility timeout**: if a worker crashes mid-job, the job becomes visible again after the timeout and is retried by another worker — no repository is silently skipped.
+4. The cron process can safely fire even if the previous wave of jobs is still being processed — workers drain the queue at their own pace without overlap.
+
+```mermaid
+flowchart LR
+    Cron["Cron (single)\nenqueues 1 job / repo"] --> Queue[("Job Queue\ne.g. BullMQ / SQS")]
+    Queue --> W1["Scanner Worker 1"]
+    Queue --> W2["Scanner Worker 2"]
+    Queue --> W3["Scanner Worker N"]
+    W1 & W2 & W3 --> GH["GitHub API"]
+    W1 & W2 & W3 --> DB[("PostgreSQL")]
+    W1 & W2 & W3 --> SMTP["SMTP"]
+```
+
+**Queue options:**
+
+| Option | Infrastructure | Notes |
+|--------|---------------|-------|
+| BullMQ + Redis | Redis instance | Good fit for Node.js; supports retries, delays, concurrency limits |
+| PostgreSQL SKIP LOCKED | No new infra | Uses `SELECT … FOR UPDATE SKIP LOCKED`; works well at moderate scale |
+| AWS SQS | Managed AWS | Natural fit if already on AWS; visibility timeout built-in |
+
+**Pros:** true horizontal scalability — add workers to increase throughput linearly; overlap-safe by design; built-in retries on worker crash.  
+**Cons:** introduces a new infrastructure component (queue broker); significantly more complex than Options 1–3.
 
 #### Recommended Path
 
-For the current constraints (single EC2), **Option 1** is sufficient — it eliminates the risk of duplicate notifications if two instances are accidentally started, with zero infrastructure changes. When moving to production-scale with multiple replicas, **Option 3** is the architecturally robust solution.
+For the current constraints (single EC2), **Option 1** is sufficient — it eliminates the risk of duplicate notifications if two instances are accidentally started, with zero infrastructure changes. When moving to production-scale with a high number of repositories or strict latency requirements, **Option 4** is the correct long-term solution; **Option 3** is a reasonable intermediate step.
