@@ -52,7 +52,7 @@ flowchart TD
 | F-05 | The system sends email notifications to all confirmed subscribers when a new release is detected     |
 | F-06 | Every notification email contains an unsubscribe link with a one-time token                          |
 | F-07 | A user can unsubscribe at any time by following their unique unsubscribe link                        |
-| F-08 | The system exposes an API to list all active subscriptions for a given email                         |
+| F-08 | The system exposes an API to list all subscriptions (pending and confirmed) for a given email        |
 | F-09 | The `(email, repo)` pair is unique — a duplicate subscription returns 409                            |
 | F-10 | A static landing page allows subscribing without calling the API directly                            |
 | F-11 | Swagger UI is available at `/api/docs` for interactive API testing                                   |
