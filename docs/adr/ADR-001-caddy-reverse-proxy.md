@@ -104,7 +104,7 @@ Running the Node.js process without a separate reverse proxy.
 
 Use **Caddy 2** (`caddy:2-alpine`) as the reverse proxy in the production Docker Compose profile.
 
-Caddy was chosen because it is the only option among those considered that fully satisfies all requirements without additional tools: automatic TLS, HTTP → HTTPS redirect, and certificate storage are all handled by Caddy itself with no cron jobs, certbot, IAM roles, or privileged processes. Compared to Traefik — the only other option with built-in TLS — Caddy has a significantly simpler configuration for a static Docker Compose stack: the entire reverse proxy is reduced to a single file with three lines, whereas Traefik requires two configuration files and labels on every service. For a solo-maintained MVP this is critical — less configuration means fewer places where something can break.
+Among the options with built-in automatic TLS, Caddy wins over Traefik on configuration simplicity: a three-line `Caddyfile` versus two config files plus per-service labels — a meaningful difference for a solo-maintained static Compose stack.
 
 Configuration in `Caddyfile`:
 
