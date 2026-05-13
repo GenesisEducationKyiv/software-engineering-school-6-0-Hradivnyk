@@ -62,7 +62,6 @@ flowchart TD
 | Category            | Requirement                          | Target                                                            |
 | ------------------- | ------------------------------------ | ----------------------------------------------------------------- |
 | **Availability**    | Service uptime                       | ≥ 99% (single-instance EC2)                                       |
-| **Latency**         | P95 response time for API requests   | < 500 ms (excluding GitHub API latency)                           |
 | **Scalability**     | Number of monitored repositories     | Up to 1,000 without architectural changes                         |
 | **Reliability**     | Single email send failure            | Does not stop processing other subscribers (`Promise.allSettled`) |
 | **Reliability**     | Scanner crash                        | Does not affect HTTP request handling (graceful logging)          |
