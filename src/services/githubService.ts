@@ -21,10 +21,21 @@ export class GithubService {
     };
   }
 
-  /** Throws GitHubRateLimitError when the response status is 429.
-   *  Reads X-RateLimit-Reset header (Unix seconds) to populate resetAt. */
+  /** Throws GitHubRateLimitError when the response status is 403 or 429.
+   *  Both status codes can indicate either a primary or secondary rate limit.
+   *  Priority for determining resetAt (per GitHub docs):
+   *  1. Retry-After header (seconds) — present on secondary rate limit responses.
+   *  2. X-RateLimit-Reset header (Unix seconds) — present when x-ratelimit-remaining is 0.
+   *  3. Fallback: now + 60 seconds. */
   private handleRateLimit(response: Response): void {
-    if (response.status !== 429) return;
+    if (response.status !== 429 && response.status !== 403) return;
+
+    const retryAfter = response.headers.get('Retry-After');
+    if (retryAfter) {
+      throw new GitHubRateLimitError(
+        new Date(Date.now() + Number(retryAfter) * 1000),
+      );
+    }
 
     const resetHeader = response.headers.get('X-RateLimit-Reset');
     const resetAt = resetHeader
@@ -35,7 +46,8 @@ export class GithubService {
   }
 
   /** Returns true if the repository exists on GitHub (status 200), false on 404.
-   *  Throws GitHubRateLimitError on 429, generic Error on any other unexpected status. */
+   *  Throws GitHubRateLimitError on 403 or 429 (primary or secondary rate limit),
+   *  generic Error on any other unexpected status. */
   async repositoryExists(repo: string): Promise<boolean> {
     const response = await fetch(`${GITHUB_API}/repos/${repo}`, {
       method: 'GET',
@@ -53,7 +65,8 @@ export class GithubService {
   }
 
   /** Returns the latest release tag_name and html_url, or null if no releases exist.
-   *  Throws GitHubRateLimitError on 429, generic Error on any other unexpected status. */
+   *  Throws GitHubRateLimitError on 403 or 429 (primary or secondary rate limit),
+   *  generic Error on any other unexpected status. */
   async getLatestRelease(repo: string): Promise<Release | null> {
     const response = await fetch(
       `${GITHUB_API}/repos/${repo}/releases/latest`,
