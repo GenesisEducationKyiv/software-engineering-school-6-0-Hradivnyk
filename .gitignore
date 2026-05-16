@@ -1,4 +1,7 @@
 node_modules/
 .env
+.env.e2e
 dist/
 docker-compose.override.yml
+playwright-report/
+test-results/

@@ -7,7 +7,7 @@ import globals from 'globals';
 
 export default tseslint.config(
   // only linting our own code, not what the build tools have generated.
-  { ignores: ['dist/**', 'coverage/**'] },
+  { ignores: ['dist/**', 'coverage/**', '.claude/**'] },
 
   js.configs.recommended,
 
