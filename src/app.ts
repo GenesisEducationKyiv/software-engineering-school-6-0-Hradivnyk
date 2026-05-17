@@ -41,11 +41,24 @@ app.use(pinoHttp({ logger }));
 
 app.use(express.json());
 
-// Swagger
+// Swagger — CSP is removed for this route because Swagger UI requires
+// inline scripts that helmet's default policy would otherwise block
 const swaggerDocument = load(
   readFileSync(resolve(process.cwd(), 'swagger.yaml'), 'utf8'),
 ) as JsonObject;
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.use(
+  '/api/docs',
+  (
+    _req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    res.removeHeader('Content-Security-Policy');
+    next();
+  },
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerDocument),
+);
 
 app.use(express.urlencoded({ extended: false }));
 
