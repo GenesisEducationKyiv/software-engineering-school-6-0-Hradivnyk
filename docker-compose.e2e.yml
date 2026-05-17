@@ -7,7 +7,7 @@ services:
       - '3000:3000'
     environment:
       DATABASE_URL: postgresql://test:test@db:5432/test_db
-      SMTP_HOST: localhost
+      SMTP_HOST: mailhog
       SMTP_PORT: '1025'
       SMTP_USER: test@example.com
       SMTP_PASS: test
@@ -16,6 +16,27 @@ services:
       ALLOWED_ORIGIN: '*'
       API_KEY: test-api-key
       SCANNER_CRON_SCHEDULE: '0 * * * *'
+      # Point to the in-network mock instead of the real GitHub API so that
+      # E2E tests exercise the full internal stack without an external dependency.
+      GITHUB_API_URL: http://github-mock:3001
+
+  # Minimal GitHub API mock: returns HTTP 200 + JSON for any request,
+  # which is enough for githubService.repositoryExists() to return true.
+  github-mock:
+    image: node:20-alpine
+    command: >
+      node -e "
+        const http = require('http');
+        http.createServer((_req, res) => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ id: 1 }));
+        }).listen(3001, () => console.log('GitHub mock listening on :3001'));
+      "
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - '8025:8025' # web UI — open in browser to inspect captured emails
 
   db:
     environment:
@@ -27,3 +48,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+# Override postgres_data to use a tmpfs-backed volume so E2E tests always
+# get a fresh database, even when the named volume already exists from a
+# previous dev run (PostgreSQL ignores POSTGRES_USER/PASSWORD on an already-
+# initialised data directory, which would cause auth failures otherwise).
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs

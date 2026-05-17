@@ -61,7 +61,7 @@ export default tseslint.config(
   },
 
   {
-    files: ['.husky/**/*.mjs'],
+    files: ['.husky/**/*.mjs', 'scripts/**/*.cjs', '**/*.cjs'],
     languageOptions: {
       globals: { ...globals.node },
     },

@@ -7,7 +7,7 @@ services:
       POSTGRES_DB: test_db
     ports:
       - '5433:5432'
-    restart: unless-stopped
+    restart: no
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U test']
       interval: 5s

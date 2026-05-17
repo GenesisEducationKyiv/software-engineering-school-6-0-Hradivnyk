@@ -58,7 +58,36 @@ test.describe('home page', () => {
   });
 
   test.describe('successful subscription', () => {
-    test('shows success message and resets form', async ({ page }) => {
+    // Full-stack E2E: no page.route() mock — the real /api/subscribe endpoint
+    // is called, which hits the real DB and email service (MailHog in Docker).
+    // The only thing mocked is the external GitHub API (via the github-mock
+    // service in docker-compose.e2e.yml), so the test has no network dependency.
+    test('submits to the real API and shows success message', async ({
+      page,
+    }) => {
+      await fillAndSubmit(page, {
+        repo: VALID_REPO,
+        email: VALID_EMAIL,
+        apiKey: VALID_API_KEY,
+      });
+
+      const msg = page.locator('#msg');
+      await expect(msg).toHaveText(
+        'Subscription successful. Confirmation email sent.',
+      );
+      await expect(msg).toHaveClass('ok');
+
+      // Form must be reset after a successful submission
+      await expect(page.getByLabel('Repository (owner/repo)')).toHaveValue('');
+      await expect(page.getByLabel('Email')).toHaveValue('');
+      await expect(page.getByLabel('API Key')).toHaveValue('');
+    });
+
+    // UI-only: verifies that the JS correctly reads data.message and applies
+    // the .ok class — independent of the backend response format.
+    test('shows success message and resets form (UI mock)', async ({
+      page,
+    }) => {
       await mockSubscribe(page, 200, {
         message: 'Subscription successful. Confirmation email sent.',
       });

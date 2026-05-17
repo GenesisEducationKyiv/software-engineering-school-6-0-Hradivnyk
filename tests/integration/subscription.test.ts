@@ -27,6 +27,7 @@ async function getTokens(email = EMAIL, repo = REPO) {
     .where({ email, repo })
     .select('confirm_token', 'unsubscribe_token')
     .first();
+  expect(row).toBeDefined();
   return {
     confirmToken: row.confirm_token as string,
     unsubscribeToken: row.unsubscribe_token as string,
