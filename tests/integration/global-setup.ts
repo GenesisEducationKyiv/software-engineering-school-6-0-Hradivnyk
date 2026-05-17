@@ -55,11 +55,11 @@ export default async function globalSetup(): Promise<void> {
           getMigrationName(file: string) {
             return file.replace(/\.ts$/, '.js');
           },
-          getMigration(file: string): Knex.Migration {
-            // Jest globalSetup runs in Node; native ESM import() does not load .ts.
-            // ts-jest only hooks CommonJS require — same pattern as before the import() experiment.
+          async getMigration(file: string): Promise<Knex.Migration> {
+            // Jest globalSetup: native import() won't load .ts; ts-jest hooks require.
             // eslint-disable-next-line @typescript-eslint/no-require-imports -- see above
-            return require(join(migrationsDir, file)) as Knex.Migration;
+            const mod = require(join(migrationsDir, file)) as Knex.Migration;
+            return await Promise.resolve(mod);
           },
         },
       },
