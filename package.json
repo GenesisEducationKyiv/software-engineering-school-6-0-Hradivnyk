@@ -19,7 +19,6 @@
   "scripts": {
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "dev:e2e": "tsx src/index.ts",
     "build": "tsc",
     "migrate": "tsx src/migrate.ts",
     "migrate:rollback": "node --import tsx/esm node_modules/.bin/knex --knexfile knexfile.ts migrate:rollback",
@@ -34,11 +33,8 @@
     "test:integration": "jest --selectProjects integration",
     "test:coverage": "jest --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:api": "playwright test --config playwright.api.config.ts",
-    "test:e2e:api:ui": "playwright test --config playwright.api.config.ts --ui",
+    "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
-    "e2e:up": "docker compose -f docker-compose.e2e.yml up -d --wait",
-    "e2e:down": "docker compose -f docker-compose.e2e.yml down",
     "prepare": "node .husky/install.mjs"
   },
   "lint-staged": {
@@ -57,7 +53,6 @@
     "@types/node": "^25.5.2",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^8.0.0",
-    "@types/pg": "^8.20.0",
     "@types/pino-http": "^5.8.4",
     "@types/supertest": "^7.2.0",
     "@types/swagger-ui-express": "^4.1.8",
