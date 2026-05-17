@@ -1,0 +1,29 @@
+services:
+  app:
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: postgresql://test:test@db:5432/test_db
+      SMTP_HOST: localhost
+      SMTP_PORT: '1025'
+      SMTP_USER: test@example.com
+      SMTP_PASS: test
+      SMTP_FROM: noreply@test.example.com
+      BASE_URL: http://localhost:3000
+      ALLOWED_ORIGIN: '*'
+      API_KEY: test-api-key
+      SCANNER_CRON_SCHEDULE: '0 * * * *'
+
+  db:
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test_db
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U test']
+      interval: 5s
+      timeout: 5s
+      retries: 5

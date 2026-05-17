@@ -142,8 +142,12 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E tests
-        # Spins up the full app stack via docker-compose.yml, then runs Playwright.
+        # Spins up the full app stack via docker-compose.yml + e2e override, then runs Playwright.
+        # PLAYWRIGHT_SKIP_WEBSERVER: app runs in Docker, Playwright should not start its own server.
         run: npm run test:e2e:ci
+        env:
+          PLAYWRIGHT_SKIP_WEBSERVER: 1
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
 
   deploy:
     name: Deploy to EC2
