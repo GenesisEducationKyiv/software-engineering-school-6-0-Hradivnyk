@@ -2,6 +2,7 @@ import type { ISubscriptionModel } from '../../models/subscriptionModel.js';
 import type { IRepositoryModel } from '../../models/repositoryModel.js';
 import type { IEmailService } from '../emailService.js';
 import type { IGithubService } from '../githubService.js';
+import type { ILogger } from '../../utils/logger.js';
 import { ScannerService } from '../scannerService.js';
 
 const REPO_A = 'owner/repo-a';
@@ -30,6 +31,7 @@ describe('ScannerService', () => {
   let mockRepositoryModel: { [K in keyof IRepositoryModel]: jest.Mock };
   let mockEmailService: { [K in keyof IEmailService]: jest.Mock };
   let mockGithubService: { [K in keyof IGithubService]: jest.Mock };
+  let mockLogger: { [K in keyof ILogger]: jest.Mock };
 
   beforeEach(() => {
     mockModel = {
@@ -52,12 +54,18 @@ describe('ScannerService', () => {
       repositoryExists: jest.fn(),
       getLatestRelease: jest.fn(),
     };
+    mockLogger = {
+      info: jest.fn(),
+      debug: jest.fn(),
+      error: jest.fn(),
+    };
 
     service = new ScannerService(
       mockModel,
       mockRepositoryModel,
       mockEmailService,
       mockGithubService,
+      mockLogger,
     );
   });
 

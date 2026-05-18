@@ -9,6 +9,7 @@ import { SubscriptionService } from './services/subscriptionService.js';
 import { ScannerService } from './services/scannerService.js';
 import { SubscriptionController } from './controllers/subscriptionController.js';
 import { config } from './config/index.js';
+import logger from './utils/logger.js';
 
 const repositoryModel = new RepositoryModel();
 const subscriptionModel = new SubscriptionModel(repositoryModel);
@@ -37,6 +38,7 @@ export const scannerService = new ScannerService(
   repositoryModel,
   emailService,
   githubService,
+  logger,
 );
 
 export const subscriptionController = new SubscriptionController(
