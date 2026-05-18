@@ -1,18 +1,10 @@
 import type { Request, Response, NextFunction } from 'express';
-import type { Subscription } from '../types.js';
 import {
   subscribeSchema,
   tokenSchema,
   emailQuerySchema,
 } from '../schemas/subscriptionSchemas.js';
-
-// The controller owns the contract it depends on — a core tenet of DIP.
-export interface ISubscriptionService {
-  subscribe(email: string, repo: string): Promise<void>;
-  confirm(token: string): Promise<void>;
-  unsubscribe(token: string): Promise<void>;
-  getSubscriptions(email: string): Promise<Subscription[]>;
-}
+import type { ISubscriptionService } from '../services/subscriptionService.js';
 
 export class SubscriptionController {
   constructor(private readonly subscriptionService: ISubscriptionService) {}

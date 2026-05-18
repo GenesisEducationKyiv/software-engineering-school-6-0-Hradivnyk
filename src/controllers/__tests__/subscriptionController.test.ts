@@ -5,10 +5,8 @@ import {
   RepositoryNotFoundError,
   TokenNotFoundError,
 } from '../../errors.js';
-import {
-  SubscriptionController,
-  type ISubscriptionService,
-} from '../subscriptionController.js';
+import { SubscriptionController } from '../subscriptionController.js';
+import type { ISubscriptionService } from '../../services/subscriptionService.js';
 
 const VALID_TOKEN = 'a'.repeat(64);
 const EMAIL = 'user@example.com';
