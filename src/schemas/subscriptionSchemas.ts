@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { TOKEN_REGEX } from '../utils/token.js';
 
-export const TOKEN_REGEX = /^[0-9a-f]{64}$/;
+export { TOKEN_REGEX };
 
 export const subscribeSchema = z.object({
   email: z.string().email('Invalid email format'),

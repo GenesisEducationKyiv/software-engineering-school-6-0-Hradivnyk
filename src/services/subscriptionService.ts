@@ -9,7 +9,7 @@ import {
 import type { ISubscriptionModel } from '../models/subscriptionModel.js';
 import type { IEmailService } from './emailService.js';
 import type { IGithubService } from './githubService.js';
-import { TOKEN_REGEX } from '../schemas/subscriptionSchemas.js';
+import { isValidToken } from '../utils/token.js';
 
 export interface ISubscriptionService {
   subscribe(email: string, repo: string): Promise<void>;
@@ -48,13 +48,13 @@ export class SubscriptionService implements ISubscriptionService {
   }
 
   async confirm(token: string): Promise<void> {
-    if (!TOKEN_REGEX.test(token)) throw new InvalidTokenError();
+    if (!isValidToken(token)) throw new InvalidTokenError();
     const found = await this.subscriptionModel.confirm(token);
     if (!found) throw new TokenNotFoundError();
   }
 
   async unsubscribe(token: string): Promise<void> {
-    if (!TOKEN_REGEX.test(token)) throw new InvalidTokenError();
+    if (!isValidToken(token)) throw new InvalidTokenError();
     const found = await this.subscriptionModel.deleteByUnsubscribeToken(token);
     if (!found) throw new TokenNotFoundError();
   }
