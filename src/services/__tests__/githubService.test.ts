@@ -44,7 +44,25 @@ describe('GithubService', () => {
       expect(result).toBe(false);
     });
 
-    it('should throw GitHubRateLimitError on 429 and parse the X-RateLimit-Reset header', async () => {
+    it('should throw GitHubRateLimitError and use Retry-After when present (takes priority)', async () => {
+      const resetUnix = Math.floor(Date.now() / 1000) + 3600;
+      fetchSpy.mockResolvedValue(
+        mockResponse(
+          429,
+          {},
+          {
+            'Retry-After': '120',
+            'X-RateLimit-Reset': String(resetUnix),
+          },
+        ),
+      );
+
+      await expect(service.repositoryExists('owner/repo')).rejects.toThrow(
+        GitHubRateLimitError,
+      );
+    });
+
+    it('should throw GitHubRateLimitError and use X-RateLimit-Reset when Retry-After is absent', async () => {
       const resetUnix = Math.floor(Date.now() / 1000) + 3600;
       mockGet.mockResolvedValue(
         mockResponse(429, {}, { 'X-RateLimit-Reset': String(resetUnix) }),
@@ -81,11 +99,24 @@ describe('GithubService', () => {
       );
     });
 
-    it('should throw a generic error on 403 without X-RateLimit-Remaining: 0', async () => {
-      mockGet.mockResolvedValue(mockResponse(403));
+    it('should throw GitHubRateLimitError on 403 with Retry-After header', async () => {
+      fetchSpy.mockResolvedValue(
+        mockResponse(403, {}, { 'Retry-After': '60' }),
+      );
 
       await expect(service.repositoryExists('owner/repo')).rejects.toThrow(
-        /unexpected status 403/,
+        GitHubRateLimitError,
+      );
+    });
+
+    it('should throw GitHubRateLimitError on 403 with X-RateLimit-Reset when Retry-After is absent', async () => {
+      const resetUnix = Math.floor(Date.now() / 1000) + 3600;
+      fetchSpy.mockResolvedValue(
+        mockResponse(403, {}, { 'X-RateLimit-Reset': String(resetUnix) }),
+      );
+
+      await expect(service.repositoryExists('owner/repo')).rejects.toThrow(
+        GitHubRateLimitError,
       );
     });
 
@@ -131,7 +162,25 @@ describe('GithubService', () => {
       expect(release).toBeNull();
     });
 
-    it('should throw GitHubRateLimitError if GitHub API returns 429', async () => {
+    it('should throw GitHubRateLimitError and use Retry-After when present (takes priority)', async () => {
+      const resetUnix = Math.floor(Date.now() / 1000) + 3600;
+      fetchSpy.mockResolvedValue(
+        mockResponse(
+          429,
+          {},
+          {
+            'Retry-After': '120',
+            'X-RateLimit-Reset': String(resetUnix),
+          },
+        ),
+      );
+
+      await expect(service.getLatestRelease('owner/repo')).rejects.toThrow(
+        GitHubRateLimitError,
+      );
+    });
+
+    it('should throw GitHubRateLimitError and use X-RateLimit-Reset when Retry-After is absent', async () => {
       const resetUnix = Math.floor(Date.now() / 1000) + 3600;
       mockGet.mockResolvedValue(
         mockResponse(429, {}, { 'X-RateLimit-Reset': String(resetUnix) }),

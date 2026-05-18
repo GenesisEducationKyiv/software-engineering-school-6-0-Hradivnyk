@@ -27,6 +27,7 @@ export class GithubService implements IGithubService {
     };
   }
 
+<<<<<<< hw3-solid-grasp
   /** Throws GitHubRateLimitError on 429, or on 403 with X-RateLimit-Remaining: 0
    *  (GitHub sends either status for both primary and secondary rate limits).
    *  Reads X-RateLimit-Reset header (Unix seconds) to populate resetAt. */
@@ -37,6 +38,23 @@ export class GithubService implements IGithubService {
         response.headers.get('X-RateLimit-Remaining') === '0');
 
     if (!isRateLimited) return;
+=======
+  /** Throws GitHubRateLimitError when the response status is 403 or 429.
+   *  Both status codes can indicate either a primary or secondary rate limit.
+   *  Priority for determining resetAt (per GitHub docs):
+   *  1. Retry-After header (seconds) — present on secondary rate limit responses.
+   *  2. X-RateLimit-Reset header (Unix seconds) — present when x-ratelimit-remaining is 0.
+   *  3. Fallback: now + 60 seconds. */
+  private handleRateLimit(response: Response): void {
+    if (response.status !== 429 && response.status !== 403) return;
+
+    const retryAfter = response.headers.get('Retry-After');
+    if (retryAfter) {
+      throw new GitHubRateLimitError(
+        new Date(Date.now() + Number(retryAfter) * 1000),
+      );
+    }
+>>>>>>> main
 
     const resetHeader = response.headers.get('X-RateLimit-Reset');
     const resetAt = resetHeader
@@ -47,7 +65,12 @@ export class GithubService implements IGithubService {
   }
 
   /** Returns true if the repository exists on GitHub (status 200), false on 404.
+<<<<<<< hw3-solid-grasp
    *  Throws GitHubRateLimitError on 429/403+remaining=0, generic Error on any other unexpected status. */
+=======
+   *  Throws GitHubRateLimitError on 403 or 429 (primary or secondary rate limit),
+   *  generic Error on any other unexpected status. */
+>>>>>>> main
   async repositoryExists(repo: string): Promise<boolean> {
     const response = await this.httpClient.get(
       `${GITHUB_API}/repos/${repo}`,
@@ -65,7 +88,12 @@ export class GithubService implements IGithubService {
   }
 
   /** Returns the latest release tag_name and html_url, or null if no releases exist.
+<<<<<<< hw3-solid-grasp
    *  Throws GitHubRateLimitError on 429/403+remaining=0, generic Error on any other unexpected status. */
+=======
+   *  Throws GitHubRateLimitError on 403 or 429 (primary or secondary rate limit),
+   *  generic Error on any other unexpected status. */
+>>>>>>> main
   async getLatestRelease(repo: string): Promise<Release | null> {
     const response = await this.httpClient.get(
       `${GITHUB_API}/repos/${repo}/releases/latest`,
