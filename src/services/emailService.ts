@@ -1,4 +1,5 @@
 import type { IEmailSender } from './emailSender.js';
+import type { IEmailTemplateBuilder } from './emailTemplateBuilder.js';
 
 export interface IEmailService {
   sendConfirmationEmail(
@@ -17,7 +18,7 @@ export interface IEmailService {
 export class EmailService implements IEmailService {
   constructor(
     private readonly sender: IEmailSender,
-    private readonly baseUrl: string,
+    private readonly templates: IEmailTemplateBuilder,
   ) {}
 
   async sendConfirmationEmail(
@@ -25,20 +26,9 @@ export class EmailService implements IEmailService {
     token: string,
     repo: string,
   ): Promise<void> {
-    const confirmUrl = `${this.baseUrl}/api/confirm/${token}`;
-
-    await this.sender.send({
-      to: email,
-      subject: `Confirm your subscription to ${repo}`,
-      text: [
-        `You requested to subscribe to GitHub release notifications for: ${repo}`,
-        '',
-        'To confirm your subscription, click the link below:',
-        confirmUrl,
-        '',
-        'If you did not make this request, ignore this email.',
-      ].join('\n'),
-    });
+    await this.sender.send(
+      this.templates.confirmationEmail(email, token, repo),
+    );
   }
 
   async sendNotificationEmail(
@@ -47,17 +37,8 @@ export class EmailService implements IEmailService {
     tag: string,
     token: string,
   ): Promise<void> {
-    const unsubscribeUrl = `${this.baseUrl}/api/unsubscribe/${token}`;
-
-    await this.sender.send({
-      to: email,
-      subject: `New release of ${repo}: ${tag}`,
-      text: [
-        `A new release of ${repo} is available: ${tag}`,
-        '',
-        'To unsubscribe from notifications for this repository, follow this link:',
-        unsubscribeUrl,
-      ].join('\n'),
-    });
+    await this.sender.send(
+      this.templates.notificationEmail(email, repo, tag, token),
+    );
   }
 }

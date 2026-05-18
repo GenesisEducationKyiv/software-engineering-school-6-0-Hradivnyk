@@ -2,6 +2,7 @@ import { RepositoryModel } from './models/repositoryModel.js';
 import { SubscriptionModel } from './models/subscriptionModel.js';
 import { EmailService } from './services/emailService.js';
 import { NodemailerEmailSender } from './services/emailSender.js';
+import { EmailTemplateBuilder } from './services/emailTemplateBuilder.js';
 import { GithubService } from './services/githubService.js';
 import { SubscriptionService } from './services/subscriptionService.js';
 import { ScannerService } from './services/scannerService.js';
@@ -17,7 +18,8 @@ const emailSender = new NodemailerEmailSender({
   pass: config.email.pass,
   from: config.email.from,
 });
-const emailService = new EmailService(emailSender, config.app.baseUrl);
+const emailTemplates = new EmailTemplateBuilder(config.app.baseUrl);
+const emailService = new EmailService(emailSender, emailTemplates);
 const githubService = new GithubService();
 
 const subscriptionService = new SubscriptionService(

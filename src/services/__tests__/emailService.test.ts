@@ -1,46 +1,52 @@
 import { EmailService } from '../emailService.js';
 import type { IEmailSender, SendMailOptions } from '../emailSender.js';
+import type { IEmailTemplateBuilder } from '../emailTemplateBuilder.js';
 
 const EMAIL = 'user@example.com';
 const REPO = 'owner/repo';
 const TOKEN = 'abc123token';
-const BASE_URL = 'http://localhost:3000';
+const TAG = 'v2.0.0';
+
+const FAKE_OPTIONS: SendMailOptions = {
+  to: EMAIL,
+  subject: 'stub subject',
+  text: 'stub text',
+};
 
 describe('EmailService', () => {
   let mockSend: jest.Mock<Promise<void>, [SendMailOptions]>;
+  let mockConfirmationEmail: jest.Mock<SendMailOptions>;
+  let mockNotificationEmail: jest.Mock<SendMailOptions>;
   let sender: IEmailSender;
+  let templates: IEmailTemplateBuilder;
   let service: EmailService;
 
   beforeEach(() => {
     mockSend = jest.fn().mockResolvedValue(undefined);
+    mockConfirmationEmail = jest.fn().mockReturnValue(FAKE_OPTIONS);
+    mockNotificationEmail = jest.fn().mockReturnValue(FAKE_OPTIONS);
     sender = { send: mockSend };
-    service = new EmailService(sender, BASE_URL);
+    templates = {
+      confirmationEmail: mockConfirmationEmail,
+      notificationEmail: mockNotificationEmail,
+    };
+    service = new EmailService(sender, templates);
   });
 
   describe('sendConfirmationEmail', () => {
-    it('should send to the correct recipient email address', async () => {
+    it('should build the template with correct arguments', async () => {
       await service.sendConfirmationEmail(EMAIL, TOKEN, REPO);
 
-      expect(mockSend).toHaveBeenCalledWith(
-        expect.objectContaining({ to: EMAIL }),
-      );
+      expect(mockConfirmationEmail).toHaveBeenCalledWith(EMAIL, TOKEN, REPO);
     });
 
-    it('should send an email with a subject containing the repo name', async () => {
+    it('should pass the built template to the sender', async () => {
       await service.sendConfirmationEmail(EMAIL, TOKEN, REPO);
 
-      const [options] = mockSend.mock.calls[0];
-      expect(options.subject).toContain(REPO);
+      expect(mockSend).toHaveBeenCalledWith(FAKE_OPTIONS);
     });
 
-    it('should send an email with a confirmation link containing the token', async () => {
-      await service.sendConfirmationEmail(EMAIL, TOKEN, REPO);
-
-      const [options] = mockSend.mock.calls[0];
-      expect(options.text).toContain(`/api/confirm/${TOKEN}`);
-    });
-
-    it('should throw an error if the mail transport fails', async () => {
+    it('should propagate errors from the sender', async () => {
       mockSend.mockRejectedValue(new Error('SMTP error'));
 
       await expect(
@@ -50,32 +56,24 @@ describe('EmailService', () => {
   });
 
   describe('sendNotificationEmail', () => {
-    const TAG = 'v2.0.0';
-
-    it('should send to the correct recipient email address', async () => {
+    it('should build the template with correct arguments', async () => {
       await service.sendNotificationEmail(EMAIL, REPO, TAG, TOKEN);
 
-      expect(mockSend).toHaveBeenCalledWith(
-        expect.objectContaining({ to: EMAIL }),
+      expect(mockNotificationEmail).toHaveBeenCalledWith(
+        EMAIL,
+        REPO,
+        TAG,
+        TOKEN,
       );
     });
 
-    it('should send a release notification email with the repo name and release tag', async () => {
+    it('should pass the built template to the sender', async () => {
       await service.sendNotificationEmail(EMAIL, REPO, TAG, TOKEN);
 
-      const [options] = mockSend.mock.calls[0];
-      expect(options.subject).toContain(REPO);
-      expect(options.subject).toContain(TAG);
+      expect(mockSend).toHaveBeenCalledWith(FAKE_OPTIONS);
     });
 
-    it('should include an unsubscribe link with the correct token', async () => {
-      await service.sendNotificationEmail(EMAIL, REPO, TAG, TOKEN);
-
-      const [options] = mockSend.mock.calls[0];
-      expect(options.text).toContain(`/api/unsubscribe/${TOKEN}`);
-    });
-
-    it('should throw an error if the mail transport fails', async () => {
+    it('should propagate errors from the sender', async () => {
       mockSend.mockRejectedValue(new Error('Connection timeout'));
 
       await expect(
