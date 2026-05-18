@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { EmailService } from '../emailService.js';
+import { EmailService, type EmailConfig } from '../emailService.js';
 
 jest.mock('nodemailer');
 
@@ -12,11 +12,20 @@ const EMAIL = 'user@example.com';
 const REPO = 'owner/repo';
 const TOKEN = 'abc123token';
 
+const testEmailConfig: EmailConfig = {
+  host: 'smtp.test',
+  port: 587,
+  user: 'user',
+  pass: 'pass',
+  from: 'noreply@test.com',
+  baseUrl: 'http://localhost:3000',
+};
+
 describe('EmailService', () => {
   let service: EmailService;
 
   beforeEach(() => {
-    service = new EmailService();
+    service = new EmailService(testEmailConfig);
     mockSendMail.mockReset();
     mockSendMail.mockResolvedValue(undefined);
   });
