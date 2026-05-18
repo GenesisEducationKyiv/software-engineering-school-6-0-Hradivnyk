@@ -46,7 +46,7 @@ describe('GithubService', () => {
 
     it('should throw GitHubRateLimitError and use Retry-After when present (takes priority)', async () => {
       const resetUnix = Math.floor(Date.now() / 1000) + 3600;
-      fetchSpy.mockResolvedValue(
+      mockGet.mockResolvedValue(
         mockResponse(
           429,
           {},
@@ -100,9 +100,7 @@ describe('GithubService', () => {
     });
 
     it('should throw GitHubRateLimitError on 403 with Retry-After header', async () => {
-      fetchSpy.mockResolvedValue(
-        mockResponse(403, {}, { 'Retry-After': '60' }),
-      );
+      mockGet.mockResolvedValue(mockResponse(403, {}, { 'Retry-After': '60' }));
 
       await expect(service.repositoryExists('owner/repo')).rejects.toThrow(
         GitHubRateLimitError,
@@ -111,7 +109,7 @@ describe('GithubService', () => {
 
     it('should throw GitHubRateLimitError on 403 with X-RateLimit-Reset when Retry-After is absent', async () => {
       const resetUnix = Math.floor(Date.now() / 1000) + 3600;
-      fetchSpy.mockResolvedValue(
+      mockGet.mockResolvedValue(
         mockResponse(403, {}, { 'X-RateLimit-Reset': String(resetUnix) }),
       );
 
@@ -164,7 +162,7 @@ describe('GithubService', () => {
 
     it('should throw GitHubRateLimitError and use Retry-After when present (takes priority)', async () => {
       const resetUnix = Math.floor(Date.now() / 1000) + 3600;
-      fetchSpy.mockResolvedValue(
+      mockGet.mockResolvedValue(
         mockResponse(
           429,
           {},
