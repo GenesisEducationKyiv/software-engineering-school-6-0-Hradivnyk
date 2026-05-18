@@ -26,10 +26,16 @@ export class GithubService implements IGithubService {
     };
   }
 
-  /** Throws GitHubRateLimitError when the response status is 429.
+  /** Throws GitHubRateLimitError on 429, or on 403 with X-RateLimit-Remaining: 0
+   *  (GitHub sends either status for both primary and secondary rate limits).
    *  Reads X-RateLimit-Reset header (Unix seconds) to populate resetAt. */
   private handleRateLimit(response: Response): void {
-    if (response.status !== 429) return;
+    const isRateLimited =
+      response.status === 429 ||
+      (response.status === 403 &&
+        response.headers.get('X-RateLimit-Remaining') === '0');
+
+    if (!isRateLimited) return;
 
     const resetHeader = response.headers.get('X-RateLimit-Reset');
     const resetAt = resetHeader

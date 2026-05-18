@@ -64,6 +64,32 @@ describe('GithubService', () => {
       );
     });
 
+    it('should throw GitHubRateLimitError on 403 with X-RateLimit-Remaining: 0', async () => {
+      const resetUnix = Math.floor(Date.now() / 1000) + 3600;
+      fetchSpy.mockResolvedValue(
+        mockResponse(
+          403,
+          {},
+          {
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(resetUnix),
+          },
+        ),
+      );
+
+      await expect(service.repositoryExists('owner/repo')).rejects.toThrow(
+        GitHubRateLimitError,
+      );
+    });
+
+    it('should throw a generic error on 403 without X-RateLimit-Remaining: 0', async () => {
+      fetchSpy.mockResolvedValue(mockResponse(403));
+
+      await expect(service.repositoryExists('owner/repo')).rejects.toThrow(
+        /unexpected status 403/,
+      );
+    });
+
     it('should throw an error if GitHub API returns an unexpected status code', async () => {
       fetchSpy.mockResolvedValue(mockResponse(500));
 
@@ -110,6 +136,24 @@ describe('GithubService', () => {
       const resetUnix = Math.floor(Date.now() / 1000) + 3600;
       fetchSpy.mockResolvedValue(
         mockResponse(429, {}, { 'X-RateLimit-Reset': String(resetUnix) }),
+      );
+
+      await expect(service.getLatestRelease('owner/repo')).rejects.toThrow(
+        GitHubRateLimitError,
+      );
+    });
+
+    it('should throw GitHubRateLimitError on 403 with X-RateLimit-Remaining: 0', async () => {
+      const resetUnix = Math.floor(Date.now() / 1000) + 3600;
+      fetchSpy.mockResolvedValue(
+        mockResponse(
+          403,
+          {},
+          {
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(resetUnix),
+          },
+        ),
       );
 
       await expect(service.getLatestRelease('owner/repo')).rejects.toThrow(
