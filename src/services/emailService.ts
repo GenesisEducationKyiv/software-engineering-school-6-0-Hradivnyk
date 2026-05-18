@@ -1,13 +1,4 @@
-import nodemailer from 'nodemailer';
-
-export interface EmailConfig {
-  host: string;
-  port: number;
-  user: string;
-  pass: string;
-  from: string;
-  baseUrl: string;
-}
+import type { IEmailSender } from './emailSender.js';
 
 export interface IEmailService {
   sendConfirmationEmail(
@@ -24,28 +15,19 @@ export interface IEmailService {
 }
 
 export class EmailService implements IEmailService {
-  private readonly transporter;
-
-  constructor(private readonly emailConfig: EmailConfig) {
-    this.transporter = nodemailer.createTransport({
-      host: emailConfig.host,
-      port: emailConfig.port,
-      auth: {
-        user: emailConfig.user,
-        pass: emailConfig.pass,
-      },
-    });
-  }
+  constructor(
+    private readonly sender: IEmailSender,
+    private readonly baseUrl: string,
+  ) {}
 
   async sendConfirmationEmail(
     email: string,
     token: string,
     repo: string,
   ): Promise<void> {
-    const confirmUrl = `${this.emailConfig.baseUrl}/api/confirm/${token}`;
+    const confirmUrl = `${this.baseUrl}/api/confirm/${token}`;
 
-    await this.transporter.sendMail({
-      from: this.emailConfig.from,
+    await this.sender.send({
       to: email,
       subject: `Confirm your subscription to ${repo}`,
       text: [
@@ -65,10 +47,9 @@ export class EmailService implements IEmailService {
     tag: string,
     token: string,
   ): Promise<void> {
-    const unsubscribeUrl = `${this.emailConfig.baseUrl}/api/unsubscribe/${token}`;
+    const unsubscribeUrl = `${this.baseUrl}/api/unsubscribe/${token}`;
 
-    await this.transporter.sendMail({
-      from: this.emailConfig.from,
+    await this.sender.send({
       to: email,
       subject: `New release of ${repo}: ${tag}`,
       text: [

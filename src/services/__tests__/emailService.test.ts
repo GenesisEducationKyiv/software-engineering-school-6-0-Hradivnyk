@@ -1,40 +1,27 @@
-import nodemailer from 'nodemailer';
-import { EmailService, type EmailConfig } from '../emailService.js';
-
-jest.mock('nodemailer');
-
-const mockSendMail = jest.fn();
-jest.mocked(nodemailer).createTransport.mockReturnValue({
-  sendMail: mockSendMail,
-} as unknown as ReturnType<typeof nodemailer.createTransport>);
+import { EmailService } from '../emailService.js';
+import type { IEmailSender, SendMailOptions } from '../emailSender.js';
 
 const EMAIL = 'user@example.com';
 const REPO = 'owner/repo';
 const TOKEN = 'abc123token';
-
-const testEmailConfig: EmailConfig = {
-  host: 'smtp.test',
-  port: 587,
-  user: 'user',
-  pass: 'pass',
-  from: 'noreply@test.com',
-  baseUrl: 'http://localhost:3000',
-};
+const BASE_URL = 'http://localhost:3000';
 
 describe('EmailService', () => {
+  let mockSend: jest.Mock<Promise<void>, [SendMailOptions]>;
+  let sender: IEmailSender;
   let service: EmailService;
 
   beforeEach(() => {
-    service = new EmailService(testEmailConfig);
-    mockSendMail.mockReset();
-    mockSendMail.mockResolvedValue(undefined);
+    mockSend = jest.fn().mockResolvedValue(undefined);
+    sender = { send: mockSend };
+    service = new EmailService(sender, BASE_URL);
   });
 
   describe('sendConfirmationEmail', () => {
     it('should send to the correct recipient email address', async () => {
       await service.sendConfirmationEmail(EMAIL, TOKEN, REPO);
 
-      expect(mockSendMail).toHaveBeenCalledWith(
+      expect(mockSend).toHaveBeenCalledWith(
         expect.objectContaining({ to: EMAIL }),
       );
     });
@@ -42,19 +29,19 @@ describe('EmailService', () => {
     it('should send an email with a subject containing the repo name', async () => {
       await service.sendConfirmationEmail(EMAIL, TOKEN, REPO);
 
-      const [mailOptions] = mockSendMail.mock.calls[0];
-      expect(mailOptions.subject).toContain(REPO);
+      const [options] = mockSend.mock.calls[0];
+      expect(options.subject).toContain(REPO);
     });
 
     it('should send an email with a confirmation link containing the token', async () => {
       await service.sendConfirmationEmail(EMAIL, TOKEN, REPO);
 
-      const [mailOptions] = mockSendMail.mock.calls[0];
-      expect(mailOptions.text).toContain(`/api/confirm/${TOKEN}`);
+      const [options] = mockSend.mock.calls[0];
+      expect(options.text).toContain(`/api/confirm/${TOKEN}`);
     });
 
     it('should throw an error if the mail transport fails', async () => {
-      mockSendMail.mockRejectedValue(new Error('SMTP error'));
+      mockSend.mockRejectedValue(new Error('SMTP error'));
 
       await expect(
         service.sendConfirmationEmail(EMAIL, TOKEN, REPO),
@@ -68,7 +55,7 @@ describe('EmailService', () => {
     it('should send to the correct recipient email address', async () => {
       await service.sendNotificationEmail(EMAIL, REPO, TAG, TOKEN);
 
-      expect(mockSendMail).toHaveBeenCalledWith(
+      expect(mockSend).toHaveBeenCalledWith(
         expect.objectContaining({ to: EMAIL }),
       );
     });
@@ -76,20 +63,20 @@ describe('EmailService', () => {
     it('should send a release notification email with the repo name and release tag', async () => {
       await service.sendNotificationEmail(EMAIL, REPO, TAG, TOKEN);
 
-      const [mailOptions] = mockSendMail.mock.calls[0];
-      expect(mailOptions.subject).toContain(REPO);
-      expect(mailOptions.subject).toContain(TAG);
+      const [options] = mockSend.mock.calls[0];
+      expect(options.subject).toContain(REPO);
+      expect(options.subject).toContain(TAG);
     });
 
     it('should include an unsubscribe link with the correct token', async () => {
       await service.sendNotificationEmail(EMAIL, REPO, TAG, TOKEN);
 
-      const [mailOptions] = mockSendMail.mock.calls[0];
-      expect(mailOptions.text).toContain(`/api/unsubscribe/${TOKEN}`);
+      const [options] = mockSend.mock.calls[0];
+      expect(options.text).toContain(`/api/unsubscribe/${TOKEN}`);
     });
 
     it('should throw an error if the mail transport fails', async () => {
-      mockSendMail.mockRejectedValue(new Error('Connection timeout'));
+      mockSend.mockRejectedValue(new Error('Connection timeout'));
 
       await expect(
         service.sendNotificationEmail(EMAIL, REPO, TAG, TOKEN),
