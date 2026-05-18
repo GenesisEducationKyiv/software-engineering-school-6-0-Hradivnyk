@@ -4,6 +4,7 @@ import { EmailService } from './services/emailService.js';
 import { NodemailerEmailSender } from './services/emailSender.js';
 import { EmailTemplateBuilder } from './services/emailTemplateBuilder.js';
 import { GithubService } from './services/githubService.js';
+import { FetchHttpClient } from './httpClient.js';
 import { SubscriptionService } from './services/subscriptionService.js';
 import { ScannerService } from './services/scannerService.js';
 import { SubscriptionController } from './controllers/subscriptionController.js';
@@ -20,7 +21,10 @@ const emailSender = new NodemailerEmailSender({
 });
 const emailTemplates = new EmailTemplateBuilder(config.app.baseUrl);
 const emailService = new EmailService(emailSender, emailTemplates);
-const githubService = new GithubService();
+const githubService = new GithubService(
+  new FetchHttpClient(),
+  config.github.token,
+);
 
 const subscriptionService = new SubscriptionService(
   subscriptionModel,

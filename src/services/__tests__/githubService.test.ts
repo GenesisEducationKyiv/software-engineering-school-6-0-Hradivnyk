@@ -1,5 +1,6 @@
 import { GitHubRateLimitError } from '../../errors.js';
 import { GithubService } from '../githubService.js';
+import type { IHttpClient } from '../../httpClient.js';
 
 function mockResponse(
   status: number,
@@ -16,21 +17,19 @@ function mockResponse(
 }
 
 describe('GithubService', () => {
+  let mockGet: jest.Mock<Promise<Response>>;
+  let httpClient: IHttpClient;
   let service: GithubService;
-  let fetchSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    service = new GithubService();
-    fetchSpy = jest.spyOn(global, 'fetch');
-  });
-
-  afterEach(() => {
-    fetchSpy.mockRestore();
+    mockGet = jest.fn();
+    httpClient = { get: mockGet };
+    service = new GithubService(httpClient);
   });
 
   describe('repositoryExists', () => {
     it('should return true if GitHub API responds with 200 for a valid repository', async () => {
-      fetchSpy.mockResolvedValue(mockResponse(200));
+      mockGet.mockResolvedValue(mockResponse(200));
 
       const result = await service.repositoryExists('owner/repo');
 
@@ -38,7 +37,7 @@ describe('GithubService', () => {
     });
 
     it('should return false if GitHub API responds with 404', async () => {
-      fetchSpy.mockResolvedValue(mockResponse(404));
+      mockGet.mockResolvedValue(mockResponse(404));
 
       const result = await service.repositoryExists('owner/nonexistent');
 
@@ -47,7 +46,7 @@ describe('GithubService', () => {
 
     it('should throw GitHubRateLimitError on 429 and parse the X-RateLimit-Reset header', async () => {
       const resetUnix = Math.floor(Date.now() / 1000) + 3600;
-      fetchSpy.mockResolvedValue(
+      mockGet.mockResolvedValue(
         mockResponse(429, {}, { 'X-RateLimit-Reset': String(resetUnix) }),
       );
 
@@ -57,7 +56,7 @@ describe('GithubService', () => {
     });
 
     it('should throw GitHubRateLimitError with a fallback resetAt when the header is missing', async () => {
-      fetchSpy.mockResolvedValue(mockResponse(429));
+      mockGet.mockResolvedValue(mockResponse(429));
 
       await expect(service.repositoryExists('owner/repo')).rejects.toThrow(
         GitHubRateLimitError,
@@ -66,7 +65,7 @@ describe('GithubService', () => {
 
     it('should throw GitHubRateLimitError on 403 with X-RateLimit-Remaining: 0', async () => {
       const resetUnix = Math.floor(Date.now() / 1000) + 3600;
-      fetchSpy.mockResolvedValue(
+      mockGet.mockResolvedValue(
         mockResponse(
           403,
           {},
@@ -83,7 +82,7 @@ describe('GithubService', () => {
     });
 
     it('should throw a generic error on 403 without X-RateLimit-Remaining: 0', async () => {
-      fetchSpy.mockResolvedValue(mockResponse(403));
+      mockGet.mockResolvedValue(mockResponse(403));
 
       await expect(service.repositoryExists('owner/repo')).rejects.toThrow(
         /unexpected status 403/,
@@ -91,7 +90,7 @@ describe('GithubService', () => {
     });
 
     it('should throw an error if GitHub API returns an unexpected status code', async () => {
-      fetchSpy.mockResolvedValue(mockResponse(500));
+      mockGet.mockResolvedValue(mockResponse(500));
 
       await expect(service.repositoryExists('owner/repo')).rejects.toThrow(
         /unexpected status 500/,
@@ -99,7 +98,7 @@ describe('GithubService', () => {
     });
 
     it('should throw an error if the network request fails', async () => {
-      fetchSpy.mockRejectedValue(new Error('Network error'));
+      mockGet.mockRejectedValue(new Error('Network error'));
 
       await expect(service.repositoryExists('owner/repo')).rejects.toThrow(
         'Network error',
@@ -109,7 +108,7 @@ describe('GithubService', () => {
 
   describe('getLatestRelease', () => {
     it('should return the latest release tag for a repository', async () => {
-      fetchSpy.mockResolvedValue(
+      mockGet.mockResolvedValue(
         mockResponse(200, {
           tag_name: 'v1.2.3',
           html_url: 'https://github.com/owner/repo/releases/tag/v1.2.3',
@@ -125,7 +124,7 @@ describe('GithubService', () => {
     });
 
     it('should return null if the repository has no releases', async () => {
-      fetchSpy.mockResolvedValue(mockResponse(404));
+      mockGet.mockResolvedValue(mockResponse(404));
 
       const release = await service.getLatestRelease('owner/repo');
 
@@ -134,7 +133,7 @@ describe('GithubService', () => {
 
     it('should throw GitHubRateLimitError if GitHub API returns 429', async () => {
       const resetUnix = Math.floor(Date.now() / 1000) + 3600;
-      fetchSpy.mockResolvedValue(
+      mockGet.mockResolvedValue(
         mockResponse(429, {}, { 'X-RateLimit-Reset': String(resetUnix) }),
       );
 
@@ -145,7 +144,7 @@ describe('GithubService', () => {
 
     it('should throw GitHubRateLimitError on 403 with X-RateLimit-Remaining: 0', async () => {
       const resetUnix = Math.floor(Date.now() / 1000) + 3600;
-      fetchSpy.mockResolvedValue(
+      mockGet.mockResolvedValue(
         mockResponse(
           403,
           {},
@@ -162,7 +161,7 @@ describe('GithubService', () => {
     });
 
     it('should throw an error if GitHub API returns an unexpected status code', async () => {
-      fetchSpy.mockResolvedValue(mockResponse(503));
+      mockGet.mockResolvedValue(mockResponse(503));
 
       await expect(service.getLatestRelease('owner/repo')).rejects.toThrow(
         /unexpected status 503/,
@@ -170,7 +169,7 @@ describe('GithubService', () => {
     });
 
     it('should throw an error if the network request fails', async () => {
-      fetchSpy.mockRejectedValue(new Error('Connection refused'));
+      mockGet.mockRejectedValue(new Error('Connection refused'));
 
       await expect(service.getLatestRelease('owner/repo')).rejects.toThrow(
         'Connection refused',

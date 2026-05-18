@@ -1,5 +1,5 @@
 import { GitHubRateLimitError } from '../errors.js';
-import { config } from '../config/index.js';
+import type { IHttpClient } from '../httpClient.js';
 
 const GITHUB_API = 'https://api.github.com';
 
@@ -16,13 +16,14 @@ export interface IGithubService {
 export class GithubService implements IGithubService {
   private readonly headers: HeadersInit;
 
-  constructor() {
+  constructor(
+    private readonly httpClient: IHttpClient,
+    token?: string,
+  ) {
     this.headers = {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
-      ...(config.github.token
-        ? { Authorization: `Bearer ${config.github.token}` }
-        : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   }
 
@@ -46,12 +47,12 @@ export class GithubService implements IGithubService {
   }
 
   /** Returns true if the repository exists on GitHub (status 200), false on 404.
-   *  Throws GitHubRateLimitError on 429, generic Error on any other unexpected status. */
+   *  Throws GitHubRateLimitError on 429/403+remaining=0, generic Error on any other unexpected status. */
   async repositoryExists(repo: string): Promise<boolean> {
-    const response = await fetch(`${GITHUB_API}/repos/${repo}`, {
-      method: 'GET',
-      headers: this.headers,
-    });
+    const response = await this.httpClient.get(
+      `${GITHUB_API}/repos/${repo}`,
+      this.headers,
+    );
 
     if (response.status === 200) return true;
     if (response.status === 404) return false;
@@ -64,14 +65,11 @@ export class GithubService implements IGithubService {
   }
 
   /** Returns the latest release tag_name and html_url, or null if no releases exist.
-   *  Throws GitHubRateLimitError on 429, generic Error on any other unexpected status. */
+   *  Throws GitHubRateLimitError on 429/403+remaining=0, generic Error on any other unexpected status. */
   async getLatestRelease(repo: string): Promise<Release | null> {
-    const response = await fetch(
+    const response = await this.httpClient.get(
       `${GITHUB_API}/repos/${repo}/releases/latest`,
-      {
-        method: 'GET',
-        headers: this.headers,
-      },
+      this.headers,
     );
 
     if (response.status === 404) return null;
