@@ -1,5 +1,10 @@
 services:
   app:
+    depends_on:
+      db:
+        condition: service_healthy
+      github-mock:
+        condition: service_started
     env_file:
       - path: .env
         required: false
