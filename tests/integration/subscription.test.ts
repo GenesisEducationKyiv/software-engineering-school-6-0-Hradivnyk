@@ -13,7 +13,13 @@ const mockedEmail = jest.mocked(emailService);
 
 const EMAIL = 'integration@example.com';
 const REPO = 'owner/repo';
-const API_KEY = process.env.API_KEY as string;
+const API_KEY =
+  process.env.API_KEY ??
+  (() => {
+    throw new Error(
+      'API_KEY environment variable is required for integration tests',
+    );
+  })();
 
 async function subscribe(email = EMAIL, repo = REPO) {
   return request(app)
