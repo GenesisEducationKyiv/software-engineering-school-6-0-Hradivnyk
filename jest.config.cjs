@@ -12,7 +12,6 @@ const baseConfig = {
 
 module.exports = {
   ...baseConfig,
-  testMatch: ['**/__tests__/**/*.test.ts', '**/tests/integration/**/*.test.ts'],
   projects: [
     {
       ...baseConfig,
