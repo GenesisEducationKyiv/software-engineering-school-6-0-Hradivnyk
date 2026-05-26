@@ -30,7 +30,7 @@
     "format:check": "prettier --check .",
     "test": "npm run test:unit && npm run test:integration:ci && npm run test:e2e:ci",
     "test:unit": "jest --selectProjects unit",
-    "test:unit:coverage": "jest --selectProjects unit --coverage",
+    "test:unit:coverage": "npm run test:unit -- --coverage",
     "test:integration:ci": "node scripts/run-with-compose.cjs -f docker-compose.test.yml -- jest --selectProjects integration --runInBand",
     "test:e2e": "playwright test",
     "test:e2e:ci": "node scripts/run-with-compose.cjs -p software-engineering-school-6-0-hradivnyk-e2e -f docker-compose.yml -f docker-compose.e2e.yml -- playwright test",
