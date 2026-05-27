@@ -80,6 +80,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Create .env.test
+        run: cp .env.test.example .env.test
+
       - name: Run integration tests
         # Spins up postgres via docker-compose.test.yml, runs jest, then tears it down.
         run: npm run test:integration:ci
