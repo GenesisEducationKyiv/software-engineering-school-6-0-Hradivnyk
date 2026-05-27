@@ -17,10 +17,10 @@ export default async function globalSetup(): Promise<void> {
     override: true,
   });
   if (envLoaded.error) {
-    config({
-      path: resolve(process.cwd(), '.env.test.example'),
-      override: true,
-    });
+    throw new Error(
+      'Missing .env.test — copy .env.test.example to get started:\n' +
+        '  cp .env.test.example .env.test',
+    );
   }
 
   const migrationsDir = join(process.cwd(), 'src', 'db', 'migrations');
