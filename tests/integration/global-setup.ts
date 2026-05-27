@@ -65,14 +65,16 @@ export default async function globalSetup(): Promise<void> {
       },
     });
 
-  const runMigrationsWithRetry = async (attempt: number): Promise<void> => {
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
     const knex = createKnex();
     try {
       console.log(
         `\nRunning DB migrations (attempt ${attempt}/${RETRY_ATTEMPTS})...`,
       );
+      // eslint-disable-next-line no-await-in-loop
       await knex.migrate.latest();
       console.log('Migrations complete.\n');
+      return;
     } catch (err) {
       if (attempt >= RETRY_ATTEMPTS) {
         throw err;
@@ -80,12 +82,11 @@ export default async function globalSetup(): Promise<void> {
       console.warn(
         `  Failed: ${(err as Error).message}. Retrying in ${RETRY_DELAY_MS / 1_000}s...`,
       );
+      // eslint-disable-next-line no-await-in-loop
       await sleep(RETRY_DELAY_MS);
-      await runMigrationsWithRetry(attempt + 1);
     } finally {
+      // eslint-disable-next-line no-await-in-loop
       await knex.destroy().catch(() => {});
     }
-  };
-
-  await runMigrationsWithRetry(1);
+  }
 }
