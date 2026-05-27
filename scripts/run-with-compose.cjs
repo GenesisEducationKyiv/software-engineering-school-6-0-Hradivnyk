@@ -47,8 +47,18 @@ try {
   // Non-fatal — nothing to clean up on a fresh machine.
 }
 
-// 2. Bring the stack up — fail fast if this step errors.
-run(`${compose} up -d --wait`);
+// 2. Bring the stack up — fail fast (with cleanup) if this step errors,
+//    e.g. when --wait times out waiting for a health-check.
+try {
+  run(`${compose} up -d --wait`);
+} catch (err) {
+  try {
+    run(`${compose} down -v`);
+  } catch {
+    // best-effort cleanup
+  }
+  process.exit(typeof err.status === 'number' ? err.status : 1);
+}
 
 // 3. Run tests — capture the exit code without throwing.
 let testExitCode = 0;
