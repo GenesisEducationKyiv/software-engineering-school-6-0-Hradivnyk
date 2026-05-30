@@ -1,5 +1,12 @@
+import { createRequire } from 'node:module';
 import pino from 'pino';
 import { config } from '../config/index.js';
+
+const require = createRequire(import.meta.url);
+const { name, version } = require('../../package.json') as {
+  name: string;
+  version: string;
+};
 
 const getLevel = (): string => {
   if (config.server.isTest) return 'silent';
@@ -9,6 +16,12 @@ const getLevel = (): string => {
 
 const logger = pino({
   level: getLevel(),
+
+  base: {
+    service: name,
+    version,
+    env: config.server.nodeEnv,
+  },
 
   // pino-pretty only in development — in production clean JSON
   transport: config.server.isDev

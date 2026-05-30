@@ -4,7 +4,7 @@ import { AppError } from '../errors.js';
 
 export function errorHandler(
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ): void {
@@ -13,8 +13,12 @@ export function errorHandler(
     return;
   }
   if (err instanceof AppError) {
+    if (err.statusCode >= 500) {
+      req.log.error({ err }, err.message);
+    }
     res.status(err.statusCode).json({ error: err.message });
     return;
   }
+  req.log.error({ err }, 'Unhandled error');
   res.status(500).json({ error: 'Internal server error' });
 }

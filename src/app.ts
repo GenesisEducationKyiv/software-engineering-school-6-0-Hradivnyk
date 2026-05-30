@@ -3,6 +3,7 @@ import swaggerUi from 'swagger-ui-express';
 import { load } from 'js-yaml';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import type { JsonObject } from 'swagger-ui-express';
 
 import helmet from 'helmet';
@@ -37,7 +38,13 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
-app.use(pinoHttp({ logger }));
+app.use(
+  pinoHttp({
+    logger,
+    genReqId: () => randomUUID(),
+    customAttributeKeys: { reqId: 'requestId' },
+  }),
+);
 
 app.use(express.json());
 
