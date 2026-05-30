@@ -10,7 +10,20 @@ processors:
       fields: [message]
       target: ''
       overwrite_keys: true
-      add_error_key: false
+      add_error_key: true  # marks non-JSON lines with error.message; record is never dropped
+  - drop_fields:
+      fields:
+        - 'container.labels.com_docker_compose_*'
+        - 'container.labels.co_elastic_logs*'
+        - 'agent.ephemeral_id'
+        - 'agent.id'
+        - 'agent.name'
+        - 'agent.type'
+        - 'agent.version'
+        - 'ecs.version'
+        - 'log.offset'
+        - 'input.type'
+      ignore_missing: true
 
 output.elasticsearch:
   hosts: ['elasticsearch:9200']
@@ -18,6 +31,8 @@ output.elasticsearch:
 
 setup.template.name: 'app-logs'
 setup.template.pattern: 'app-logs-*'
+setup.template.overwrite: true
+setup.template.fields: /usr/share/filebeat/fields.yml
 setup.ilm.enabled: false
 
 logging.level: warning

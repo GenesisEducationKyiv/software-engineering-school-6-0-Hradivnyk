@@ -72,11 +72,23 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  es-init:
+    image: curlimages/curl:8.7.1
+    volumes:
+      - ./elasticsearch/init-template.sh:/etc/elasticsearch/init-template.sh:ro
+      - ./elasticsearch/index-template.json:/etc/elasticsearch/index-template.json:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    entrypoint: ['sh', '/etc/elasticsearch/init-template.sh']
+    restart: 'no'
+
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.13.4
     user: root
     volumes:
       - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./filebeat/fields.yml:/usr/share/filebeat/fields.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:

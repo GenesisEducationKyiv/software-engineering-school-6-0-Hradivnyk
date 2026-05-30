@@ -141,11 +141,13 @@ flowchart TB
         Filebeat["Filebeat"]
         ES[("Elasticsearch")]
         Kibana["Kibana\n(/kibana)"]
+        ESInit["es-init\n(one-shot)"]
         Caddy <-->|":3000"| App
         Caddy <-->|":5601"| Kibana
         App --> PG
         Filebeat -->|"JSON logs"| ES
         Kibana --> ES
+        ESInit -->|"PUT /_index_template"| ES
     end
     GitHub["GitHub REST API"]
     SMTP["SMTP Server"]
@@ -477,6 +479,10 @@ Node.js (Pino JSON) → Docker log driver → Filebeat → Elasticsearch → Kib
 ```
 
 Filebeat reads container logs via the Docker socket and uses the `co.elastic.logs/*` labels on the `app` container to parse output as JSON. In production, Kibana is available at `https://<DOMAIN>/kibana` behind Caddy `basic_auth`.
+
+**Index template (`es-init`):**
+
+An `es-init` one-shot container (`curlimages/curl`) runs on every `docker compose up`, after Elasticsearch passes its health check. It applies the composable index template from `elasticsearch/index-template.json` via `PUT /_index_template/app-logs`. A `dynamic_template` maps any unmapped string field to `keyword` by default, preventing Elasticsearch from auto-guessing `text` for new fields.
 
 ### 9.2 Metrics (planned)
 

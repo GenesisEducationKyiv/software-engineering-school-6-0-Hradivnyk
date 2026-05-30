@@ -23,6 +23,10 @@ const logger = pino({
     env: config.server.nodeEnv,
   },
 
+  formatters: {
+    level: (label) => ({ level: label }),
+  },
+
   // pino-pretty only in development — in production clean JSON
   transport: config.server.isDev
     ? {
