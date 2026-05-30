@@ -138,13 +138,21 @@ flowchart TB
         Caddy["Caddy (TLS)\n:80 / :443"]
         App["Node.js App"]
         PG[("PostgreSQL 16")]
+        Filebeat["Filebeat"]
+        ES[("Elasticsearch")]
+        Kibana["Kibana\n(/kibana)"]
         Caddy <-->|":3000"| App
+        Caddy <-->|":5601"| Kibana
         App --> PG
+        Filebeat -->|"JSON logs"| ES
+        Kibana --> ES
     end
     GitHub["GitHub REST API"]
     SMTP["SMTP Server"]
+    Docker["Docker log files"]
     App --> GitHub
     App --> SMTP
+    Docker -->|"container logs"| Filebeat
 ```
 
 ### Subscription Flow (Happy Path)
@@ -452,7 +460,7 @@ Nodemailer over standard SMTP. Compatible with any SMTP provider:
 
 ### 9.1 Logging (current)
 
-Structured JSON logging is implemented via **Pino** with `pino-http` for HTTP request logging.
+Structured JSON logging is implemented via **Pino** with `pino-http` for HTTP request logging. Logs are aggregated via the **ELK stack** (see [ADR-003](adr/ADR-003-elk-stack-logging.md)).
 
 | Level   | When used                                                               |
 | ------- | ----------------------------------------------------------------------- |
@@ -461,6 +469,14 @@ Structured JSON logging is implemented via **Pino** with `pino-http` for HTTP re
 | `ERROR` | Failures: GitHub API errors, SMTP errors, unexpected exceptions         |
 
 Every HTTP request is logged with method, URL, status code, and response time. The scanner logs each cycle: repositories checked, new releases found, emails sent.
+
+**Log pipeline:**
+
+```
+Node.js (Pino JSON) → Docker log driver → Filebeat → Elasticsearch → Kibana
+```
+
+Filebeat reads container logs via the Docker socket and uses the `co.elastic.logs/*` labels on the `app` container to parse output as JSON. In production, Kibana is available at `https://<DOMAIN>/kibana` behind Caddy `basic_auth`.
 
 ### 9.2 Metrics (planned)
 
@@ -548,3 +564,4 @@ The `deploy` job runs **only on a push to `main`** (i.e. after a PR is merged) a
 Architectural decisions deferred until the project scales beyond a single EC2 instance are tracked as ADRs:
 
 - [ADR-002: Scanner Deduplication Under Horizontal Scaling](adr/ADR-002-scanner-horizontal-scaling.md)
+- [ADR-003: ELK Stack for Log Aggregation](adr/ADR-003-elk-stack-logging.md)
