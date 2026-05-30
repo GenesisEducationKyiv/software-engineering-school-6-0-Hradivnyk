@@ -1,3 +1,12 @@
 {$DOMAIN} {
-    reverse_proxy app:3000
+    handle /kibana/* {
+        basic_auth {
+            {$KIBANA_USER} {$KIBANA_HASHED_PASSWORD}
+        }
+        reverse_proxy kibana:5601
+    }
+
+    handle {
+        reverse_proxy app:3000
+    }
 }

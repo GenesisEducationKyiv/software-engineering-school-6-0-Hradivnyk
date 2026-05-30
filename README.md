@@ -33,6 +33,7 @@ Users subscribe with their **email** and a GitHub **`owner/repo`** slug. The ser
 | Testing | Jest, Supertest (unit + integration projects) |
 | Linting / Formatting | ESLint, Prettier, Husky + lint-staged |
 | Containerisation | Docker (multi-stage, Alpine), Docker Compose, Caddy (TLS reverse proxy) |
+| Logging & Observability | Pino (JSON logs), Filebeat (log shipping), Elasticsearch (storage), Kibana (UI) |
 | CI/CD | GitHub Actions → deploy to EC2 via Docker Compose production profile |
 
 ---
@@ -148,6 +149,24 @@ To enable HTTPS via Caddy (set `DOMAIN` in `.env` first):
 docker compose --profile production up --build
 ```
 
+### Logging (ELK Stack)
+
+The stack includes Filebeat → Elasticsearch → Kibana for log aggregation.
+
+**Local development** — Kibana UI is available at `http://localhost:5601` when using the override file:
+
+```bash
+cp docker-compose.override.yml.example docker-compose.override.yml
+docker compose up --build
+```
+
+**Production** — Kibana is accessible at `https://<DOMAIN>/kibana` and is protected by basic auth. No extra DNS configuration is needed. Set `KIBANA_USER` and `KIBANA_HASHED_PASSWORD` in `.env`:
+
+```bash
+# Generate password hash
+docker run --rm caddy:2-alpine caddy hash-password --plaintext yourpassword
+```
+
 ### Testing
 
 ```bash
@@ -194,3 +213,5 @@ See [`.env.example`](.env.example) for the full reference. Key variables:
 | `GITHUB_TOKEN` | No | Increases GitHub API rate limit from 60 → 5 000 req/h |
 | `API_KEY` | No | Enables `X-API-Key` authentication |
 | `SCANNER_CRON_SCHEDULE` | No | Cron expression for release checks (default: `0 * * * *`) |
+| `KIBANA_USER` | No | Username for Kibana basic auth (production only) |
+| `KIBANA_HASHED_PASSWORD` | No | Bcrypt-hashed password for Kibana (generate with `caddy hash-password`) |
