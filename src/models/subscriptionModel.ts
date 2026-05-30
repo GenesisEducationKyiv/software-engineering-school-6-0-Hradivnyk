@@ -40,20 +40,26 @@ export class SubscriptionModel {
     return row !== undefined;
   }
 
-  // Sets subscription status to confirmed. Returns false if the token was not found.
-  async confirm(confirmToken: string): Promise<boolean> {
-    const count = await knex('subscriptions')
+  // Sets subscription status to confirmed. Returns the subscription row, or null if token not found.
+  async confirm(
+    confirmToken: string,
+  ): Promise<{ email: string; repo: string } | null> {
+    const rows: { email: string; repo: string }[] = await knex('subscriptions')
       .where({ confirm_token: confirmToken })
-      .update({ status: 'confirmed' });
-    return count > 0;
+      .update({ status: 'confirmed' })
+      .returning(['email', 'repo']);
+    return rows[0] ?? null;
   }
 
-  // Deletes the subscription by its unsubscribe token. Returns false if not found.
-  async deleteByUnsubscribeToken(unsubscribeToken: string): Promise<boolean> {
-    const count = await knex('subscriptions')
+  // Deletes the subscription by its unsubscribe token. Returns the subscription row, or null if not found.
+  async deleteByUnsubscribeToken(
+    unsubscribeToken: string,
+  ): Promise<{ email: string; repo: string } | null> {
+    const rows: { email: string; repo: string }[] = await knex('subscriptions')
       .where({ unsubscribe_token: unsubscribeToken })
-      .delete();
-    return count > 0;
+      .delete()
+      .returning(['email', 'repo']);
+    return rows[0] ?? null;
   }
 
   // Returns all confirmed subscriptions with their unsubscribe tokens and last seen tag.

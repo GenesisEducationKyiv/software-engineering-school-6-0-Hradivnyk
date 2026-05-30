@@ -14,11 +14,11 @@ export function errorHandler(
   }
   if (err instanceof AppError) {
     if (err.statusCode >= 500) {
-      req.log.error({ err }, err.message);
+      req.log.error({ event: 'error.app_error', err }, err.message);
     }
     res.status(err.statusCode).json({ error: err.message });
     return;
   }
-  req.log.error({ err }, 'Unhandled error');
+  req.log.error({ event: 'error.unhandled', err }, 'Unhandled error');
   res.status(500).json({ error: 'Internal server error' });
 }

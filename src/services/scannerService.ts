@@ -27,7 +27,10 @@ export class ScannerService {
       const release = await githubService.getLatestRelease(repo);
 
       if (!release) {
-        logger.debug({ repo }, 'Scanner: no releases found');
+        logger.debug(
+          { event: 'scanner.no_releases', repo },
+          'No releases found',
+        );
         return;
       }
 
@@ -35,15 +38,15 @@ export class ScannerService {
 
       if (release.tag_name === lastSeenTag) {
         logger.debug(
-          { repo, tag: release.tag_name },
-          'Scanner: no new release',
+          { event: 'scanner.no_new_release', repo, tag: release.tag_name },
+          'No new release',
         );
         return;
       }
 
       logger.info(
-        { repo, tag: release.tag_name },
-        'Scanner: new release detected, sending notifications',
+        { event: 'scanner.release_detected', repo, tag: release.tag_name },
+        'New release detected',
       );
 
       await Promise.allSettled(
@@ -57,8 +60,13 @@ export class ScannerService {
             )
             .catch((err: unknown) => {
               logger.error(
-                { err, email: sub.email, repo },
-                'Scanner: failed to send notification email',
+                {
+                  event: 'scanner.notification_failed',
+                  err,
+                  email: sub.email,
+                  repo,
+                },
+                'Failed to send notification email',
               );
             }),
         ),
@@ -66,17 +74,23 @@ export class ScannerService {
 
       await subscriptionModel.updateLastSeenTag(repo, release.tag_name);
     } catch (err) {
-      logger.error({ err, repo }, 'Scanner: error processing repo');
+      logger.error(
+        { event: 'scanner.repo_error', err, repo },
+        'Error processing repo',
+      );
     }
   }
 
   async scan(): Promise<void> {
-    logger.info('Scanner: starting release check');
+    logger.info({ event: 'scanner.check_started' }, 'Starting release check');
 
     const subscriptions = await subscriptionModel.findAllConfirmedWithTokens();
 
     if (subscriptions.length === 0) {
-      logger.info('Scanner: no active subscriptions, skipping');
+      logger.info(
+        { event: 'scanner.no_subscriptions' },
+        'No active subscriptions, skipping',
+      );
       return;
     }
 
@@ -87,7 +101,7 @@ export class ScannerService {
       await this.processRepo(repo, subscribers); // sequential to respect GitHub API rate limits
     }
 
-    logger.info('Scanner: release check complete');
+    logger.info({ event: 'scanner.check_complete' }, 'Release check complete');
   }
 
   start(): void {
@@ -99,13 +113,16 @@ export class ScannerService {
 
     cron.schedule(config.scanner.cronSchedule, () => {
       this.scan().catch((err: unknown) => {
-        logger.error({ err }, 'Scanner: unhandled error during scan');
+        logger.error(
+          { event: 'scanner.unhandled_error', err },
+          'Unhandled error during scan',
+        );
       });
     });
 
     logger.info(
-      { schedule: config.scanner.cronSchedule },
-      'Scanner: scheduled',
+      { event: 'scanner.scheduled', schedule: config.scanner.cronSchedule },
+      'Scanner scheduled',
     );
   }
 }
