@@ -14,3 +14,7 @@ services:
   prometheus:
     ports:
       - '9090:9090'
+
+  grafana:
+    ports:
+      - '3001:3000'

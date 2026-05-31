@@ -110,6 +110,28 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  grafana:
+    image: grafana/grafana:11.6.1
+    environment:
+      GF_SERVER_ROOT_URL: '%(protocol)s://%(domain)s/grafana/'
+      GF_SERVER_SERVE_FROM_SUB_PATH: 'true'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/grafana/api/health | grep -q ok']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   prometheus:
     image: prom/prometheus:v3.12.0
     volumes:
@@ -130,3 +152,4 @@ volumes:
   caddy_config:
   es_data:
   prometheus_data:
+  grafana_data:
