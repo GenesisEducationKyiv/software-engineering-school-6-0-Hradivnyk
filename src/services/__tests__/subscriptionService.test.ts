@@ -95,7 +95,7 @@ describe('SubscriptionService', () => {
 
   describe('confirm', () => {
     it('should mark the subscription as confirmed in the database', async () => {
-      mockedModel.confirm.mockResolvedValue(true);
+      mockedModel.confirm.mockResolvedValue({ email: EMAIL, repo: REPO });
 
       await service.confirm(VALID_TOKEN);
 
@@ -103,7 +103,7 @@ describe('SubscriptionService', () => {
     });
 
     it('should throw TokenNotFoundError if the token does not exist', async () => {
-      mockedModel.confirm.mockResolvedValue(false);
+      mockedModel.confirm.mockResolvedValue(null);
 
       await expect(service.confirm(VALID_TOKEN)).rejects.toThrow(
         TokenNotFoundError,
@@ -119,7 +119,10 @@ describe('SubscriptionService', () => {
 
   describe('unsubscribe', () => {
     it('should remove the subscription from the database', async () => {
-      mockedModel.deleteByUnsubscribeToken.mockResolvedValue(true);
+      mockedModel.deleteByUnsubscribeToken.mockResolvedValue({
+        email: EMAIL,
+        repo: REPO,
+      });
 
       await service.unsubscribe(VALID_TOKEN);
 
@@ -129,7 +132,7 @@ describe('SubscriptionService', () => {
     });
 
     it('should throw TokenNotFoundError if the token does not exist', async () => {
-      mockedModel.deleteByUnsubscribeToken.mockResolvedValue(false);
+      mockedModel.deleteByUnsubscribeToken.mockResolvedValue(null);
 
       await expect(service.unsubscribe(VALID_TOKEN)).rejects.toThrow(
         TokenNotFoundError,
