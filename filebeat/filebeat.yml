@@ -10,7 +10,7 @@ processors:
       fields: [message]
       target: ''
       overwrite_keys: true
-      add_error_key: true  # marks non-JSON lines with error.message; record is never dropped
+      add_error_key: true # marks non-JSON lines with error.message; record is never dropped
   - drop_fields:
       fields:
         - 'container.labels.com_docker_compose_*'

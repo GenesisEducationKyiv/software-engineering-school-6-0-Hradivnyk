@@ -20,27 +20,27 @@
         }
       ],
       "properties": {
-        "@timestamp":  { "type": "date" },
-        "time":        { "type": "date", "format": "epoch_millis" },
-        "level":       { "type": "keyword" },
-        "msg":         { "type": "text" },
-        "event":       { "type": "keyword" },
-        "service":     { "type": "keyword" },
-        "version":     { "type": "keyword" },
-        "env":         { "type": "keyword" },
-        "repo":        { "type": "keyword" },
-        "email":       { "type": "keyword" },
-        "requestId":   { "type": "keyword" },
-        "reqId":       { "type": "keyword" },
-        "durationMs":  { "type": "long" },
-        "port":        { "type": "integer" },
-        "pid":         { "type": "integer" },
-        "hostname":    { "type": "keyword" },
+        "@timestamp": { "type": "date" },
+        "time": { "type": "date", "format": "epoch_millis" },
+        "level": { "type": "keyword" },
+        "msg": { "type": "text" },
+        "event": { "type": "keyword" },
+        "service": { "type": "keyword" },
+        "version": { "type": "keyword" },
+        "env": { "type": "keyword" },
+        "repo": { "type": "keyword" },
+        "email": { "type": "keyword" },
+        "requestId": { "type": "keyword" },
+        "reqId": { "type": "keyword" },
+        "durationMs": { "type": "long" },
+        "port": { "type": "integer" },
+        "pid": { "type": "integer" },
+        "hostname": { "type": "keyword" },
         "err": {
           "properties": {
             "message": { "type": "text" },
-            "type":    { "type": "keyword" },
-            "stack":   { "type": "text" }
+            "type": { "type": "keyword" },
+            "stack": { "type": "text" }
           }
         }
       }

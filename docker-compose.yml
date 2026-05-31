@@ -55,7 +55,11 @@ services:
       - es_data:/usr/share/elasticsearch/data
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'curl -sf http://localhost:9200/_cluster/health | grep -v ''"status":"red"''']
+      test:
+        [
+          'CMD-SHELL',
+          'curl -sf http://localhost:9200/_cluster/health | grep -v ''"status":"red"''',
+        ]
       interval: 10s
       timeout: 10s
       retries: 12
@@ -76,7 +80,11 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'curl -sf http://localhost:5601/kibana/api/status | grep -q available']
+      test:
+        [
+          'CMD-SHELL',
+          'curl -sf http://localhost:5601/kibana/api/status | grep -q available',
+        ]
       interval: 15s
       timeout: 10s
       retries: 20
@@ -126,7 +134,11 @@ services:
       - prometheus
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/grafana/api/health | grep -q ok']
+      test:
+        [
+          'CMD-SHELL',
+          'wget -qO- http://localhost:3000/grafana/api/health | grep -q ok',
+        ]
       interval: 10s
       timeout: 5s
       retries: 10

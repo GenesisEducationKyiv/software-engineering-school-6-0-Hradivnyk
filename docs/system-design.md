@@ -499,15 +499,15 @@ Node.js (prom-client) → GET /metrics → Prometheus (scrape) → Grafana (visu
 
 **Grafana** is available at `https://<DOMAIN>/grafana` behind Caddy `basic_auth`. On startup it auto-provisions Prometheus as the default datasource and loads the pre-built dashboard from `grafana/dashboards/github-scanner.json`.
 
-| Metric                              | Type      | Labels                      | Description                              |
-| ----------------------------------- | --------- | --------------------------- | ---------------------------------------- |
-| `http_requests_total`               | Counter   | method, route, status_code  | Total HTTP requests                      |
-| `http_request_duration_seconds`     | Histogram | method, route, status_code  | Request latency — P50/P95/P99            |
-| `github_api_requests_total`         | Counter   | operation, result           | GitHub API calls by operation and result |
-| `subscription_operations_total`     | Counter   | operation, result           | Subscribe/confirm/unsubscribe outcomes   |
-| `scanner_releases_detected_total`   | Counter   | repo                        | New releases found per repository        |
-| `scanner_emails_sent_total`         | Counter   | repo                        | Notification emails sent per repository  |
-| `scanner_scan_duration_seconds`     | Histogram | result                      | Full scanner cycle duration              |
+| Metric                            | Type      | Labels                     | Description                              |
+| --------------------------------- | --------- | -------------------------- | ---------------------------------------- |
+| `http_requests_total`             | Counter   | method, route, status_code | Total HTTP requests                      |
+| `http_request_duration_seconds`   | Histogram | method, route, status_code | Request latency — P50/P95/P99            |
+| `github_api_requests_total`       | Counter   | operation, result          | GitHub API calls by operation and result |
+| `subscription_operations_total`   | Counter   | operation, result          | Subscribe/confirm/unsubscribe outcomes   |
+| `scanner_releases_detected_total` | Counter   | repo                       | New releases found per repository        |
+| `scanner_emails_sent_total`       | Counter   | repo                       | Notification emails sent per repository  |
+| `scanner_scan_duration_seconds`   | Histogram | result                     | Full scanner cycle duration              |
 
 Default Node.js runtime metrics (CPU, heap, RSS, event-loop lag) are also collected via `collectDefaultMetrics()`.
 
