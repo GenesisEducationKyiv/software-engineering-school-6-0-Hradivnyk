@@ -15,10 +15,22 @@ import { requestContext } from './utils/requestContext.js';
 import { config } from './config/index.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { metricsMiddleware } from './middleware/metricsMiddleware.js';
+import { register } from './metrics/index.js';
 
 const app = express();
 
 app.use(express.static(resolve(process.cwd(), 'public')));
+
+app.use(metricsMiddleware);
+
+app.get('/metrics', (_req, res) => {
+  res.set('Content-Type', register.contentType);
+  register
+    .metrics()
+    .then((data) => res.send(data))
+    .catch((err: unknown) => res.status(500).send(String(err)));
+});
 
 app.use(helmet());
 

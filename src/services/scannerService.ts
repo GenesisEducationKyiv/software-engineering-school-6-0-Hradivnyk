@@ -2,6 +2,11 @@ import cron from 'node-cron';
 import { config } from '../config/index.js';
 import type { ConfirmedSubscriptionWithToken } from '../models/subscriptionModel.js';
 import { subscriptionModel } from '../models/subscriptionModel.js';
+import {
+  scannerEmailsSentTotal,
+  scannerReleasesDetectedTotal,
+  scannerScanDurationSeconds,
+} from '../metrics/index.js';
 import logger from '../utils/logger.js';
 import { emailService } from './emailService.js';
 import { githubService } from './githubService.js';
@@ -49,6 +54,8 @@ export class ScannerService {
         'New release detected',
       );
 
+      scannerReleasesDetectedTotal.inc({ repo });
+
       await Promise.allSettled(
         subscribers.map(async (sub) =>
           emailService
@@ -58,6 +65,9 @@ export class ScannerService {
               release.tag_name,
               sub.unsubscribe_token,
             )
+            .then(() => {
+              scannerEmailsSentTotal.inc({ repo });
+            })
             .catch((err: unknown) => {
               logger.error(
                 {
@@ -82,26 +92,35 @@ export class ScannerService {
   }
 
   async scan(): Promise<void> {
-    logger.info({ event: 'scanner.check_started' }, 'Starting release check');
+    const endTimer = scannerScanDurationSeconds.startTimer();
+    try {
+      logger.info({ event: 'scanner.check_started' }, 'Starting release check');
 
-    const subscriptions = await subscriptionModel.findAllConfirmedWithTokens();
+      const subscriptions =
+        await subscriptionModel.findAllConfirmedWithTokens();
 
-    if (subscriptions.length === 0) {
+      if (subscriptions.length === 0) {
+        logger.info(
+          { event: 'scanner.no_subscriptions' },
+          'No active subscriptions, skipping',
+        );
+        return;
+      }
+
+      const byRepo = groupByRepo(subscriptions);
+
+      for (const [repo, subscribers] of byRepo.entries()) {
+        // eslint-disable-next-line no-await-in-loop
+        await this.processRepo(repo, subscribers); // sequential to respect GitHub API rate limits
+      }
+
       logger.info(
-        { event: 'scanner.no_subscriptions' },
-        'No active subscriptions, skipping',
+        { event: 'scanner.check_complete' },
+        'Release check complete',
       );
-      return;
+    } finally {
+      endTimer();
     }
-
-    const byRepo = groupByRepo(subscriptions);
-
-    for (const [repo, subscribers] of byRepo.entries()) {
-      // eslint-disable-next-line no-await-in-loop
-      await this.processRepo(repo, subscribers); // sequential to respect GitHub API rate limits
-    }
-
-    logger.info({ event: 'scanner.check_complete' }, 'Release check complete');
   }
 
   start(): void {

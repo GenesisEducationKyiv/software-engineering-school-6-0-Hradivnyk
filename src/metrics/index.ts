@@ -1,0 +1,49 @@
+import client from 'prom-client';
+
+export const register = client.register;
+
+client.collectDefaultMetrics({ register });
+
+export const httpRequestsTotal = new client.Counter({
+  name: 'http_requests_total',
+  help: 'Total number of HTTP requests',
+  labelNames: ['method', 'route', 'status_code'] as const,
+  registers: [register],
+});
+
+export const httpRequestDurationSeconds = new client.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'HTTP request duration in seconds',
+  labelNames: ['method', 'route', 'status_code'] as const,
+  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+  registers: [register],
+});
+
+// RED: Errors — explicit counter for 4xx/5xx responses
+export const httpErrorsTotal = new client.Counter({
+  name: 'http_errors_total',
+  help: 'Total number of HTTP error responses (4xx and 5xx)',
+  labelNames: ['method', 'route', 'status_code'] as const,
+  registers: [register],
+});
+
+export const scannerReleasesDetectedTotal = new client.Counter({
+  name: 'scanner_releases_detected_total',
+  help: 'New GitHub releases detected by the scanner',
+  labelNames: ['repo'] as const,
+  registers: [register],
+});
+
+export const scannerEmailsSentTotal = new client.Counter({
+  name: 'scanner_emails_sent_total',
+  help: 'Notification emails sent by the scanner',
+  labelNames: ['repo'] as const,
+  registers: [register],
+});
+
+export const scannerScanDurationSeconds = new client.Histogram({
+  name: 'scanner_scan_duration_seconds',
+  help: 'Time for a full scanner cycle in seconds',
+  buckets: [0.1, 0.5, 1, 5, 10, 30, 60, 120],
+  registers: [register],
+});
