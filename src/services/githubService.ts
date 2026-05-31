@@ -1,5 +1,6 @@
 import { GitHubRateLimitError } from '../errors.js';
 import { config } from '../config/index.js';
+import { githubApiRequestsTotal } from '../metrics/index.js';
 import logger from '../utils/logger.js';
 
 const GITHUB_API = 'https://api.github.com';
@@ -28,8 +29,14 @@ export class GithubService {
    *  1. Retry-After header (seconds) — present on secondary rate limit responses.
    *  2. X-RateLimit-Reset header (Unix seconds) — present when x-ratelimit-remaining is 0.
    *  3. Fallback: now + 60 seconds. */
-  private handleRateLimit(response: Response, repo: string): void {
+  private handleRateLimit(
+    response: Response,
+    repo: string,
+    operation: string,
+  ): void {
     if (response.status !== 429 && response.status !== 403) return;
+
+    githubApiRequestsTotal.inc({ operation, result: 'rate_limited' });
 
     const retryAfter = response.headers.get('Retry-After');
     if (retryAfter) {
@@ -69,15 +76,21 @@ export class GithubService {
 
     if (response.status === 200) {
       logger.debug({ event: 'github.repo_found', repo }, 'Repo exists');
+      githubApiRequestsTotal.inc({ operation: 'repo_check', result: 'found' });
       return true;
     }
     if (response.status === 404) {
       logger.debug({ event: 'github.repo_not_found', repo }, 'Repo not found');
+      githubApiRequestsTotal.inc({
+        operation: 'repo_check',
+        result: 'not_found',
+      });
       return false;
     }
 
-    this.handleRateLimit(response, repo);
+    this.handleRateLimit(response, repo, 'repo_check');
 
+    githubApiRequestsTotal.inc({ operation: 'repo_check', result: 'error' });
     throw new Error(
       `GitHub API returned unexpected status ${response.status} for repo "${repo}"`,
     );
@@ -105,6 +118,10 @@ export class GithubService {
         { event: 'github.release_not_found', repo },
         'No releases found',
       );
+      githubApiRequestsTotal.inc({
+        operation: 'release_fetch',
+        result: 'not_found',
+      });
       return null;
     }
     if (response.status === 200) {
@@ -116,11 +133,16 @@ export class GithubService {
         { event: 'github.release_fetched', repo, tag: data.tag_name },
         'Latest release fetched',
       );
+      githubApiRequestsTotal.inc({
+        operation: 'release_fetch',
+        result: 'found',
+      });
       return { tag_name: data.tag_name, html_url: data.html_url };
     }
 
-    this.handleRateLimit(response, repo);
+    this.handleRateLimit(response, repo, 'release_fetch');
 
+    githubApiRequestsTotal.inc({ operation: 'release_fetch', result: 'error' });
     throw new Error(
       `GitHub API returned unexpected status ${response.status} for releases of "${repo}"`,
     );

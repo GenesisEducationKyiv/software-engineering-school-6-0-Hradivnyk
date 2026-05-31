@@ -93,6 +93,7 @@ export class ScannerService {
 
   async scan(): Promise<void> {
     const endTimer = scannerScanDurationSeconds.startTimer();
+    let result = 'success';
     try {
       logger.info({ event: 'scanner.check_started' }, 'Starting release check');
 
@@ -118,8 +119,11 @@ export class ScannerService {
         { event: 'scanner.check_complete' },
         'Release check complete',
       );
+    } catch (err) {
+      result = 'error';
+      throw err;
     } finally {
-      endTimer();
+      endTimer({ result });
     }
   }
 

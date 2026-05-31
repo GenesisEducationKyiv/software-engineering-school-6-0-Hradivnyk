@@ -27,6 +27,20 @@ export const httpErrorsTotal = new client.Counter({
   registers: [register],
 });
 
+export const subscriptionOperationsTotal = new client.Counter({
+  name: 'subscription_operations_total',
+  help: 'Subscription operations by type and result',
+  labelNames: ['operation', 'result'] as const,
+  registers: [register],
+});
+
+export const githubApiRequestsTotal = new client.Counter({
+  name: 'github_api_requests_total',
+  help: 'GitHub API requests by operation and result',
+  labelNames: ['operation', 'result'] as const,
+  registers: [register],
+});
+
 export const scannerReleasesDetectedTotal = new client.Counter({
   name: 'scanner_releases_detected_total',
   help: 'New GitHub releases detected by the scanner',
@@ -44,6 +58,7 @@ export const scannerEmailsSentTotal = new client.Counter({
 export const scannerScanDurationSeconds = new client.Histogram({
   name: 'scanner_scan_duration_seconds',
   help: 'Time for a full scanner cycle in seconds',
+  labelNames: ['result'] as const,
   buckets: [0.1, 0.5, 1, 5, 10, 30, 60, 120],
   registers: [register],
 });
