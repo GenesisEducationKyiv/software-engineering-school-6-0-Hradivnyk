@@ -9,6 +9,10 @@ export function errorHandler(
   _next: NextFunction,
 ): void {
   if (err instanceof ZodError) {
+    req.log.warn(
+      { event: 'error.validation', issues: err.issues },
+      'Request validation failed',
+    );
     res.status(400).json({ error: err.issues[0].message });
     return;
   }

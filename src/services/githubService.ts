@@ -1,5 +1,6 @@
 import { GitHubRateLimitError } from '../errors.js';
 import { config } from '../config/index.js';
+import logger from '../utils/logger.js';
 
 const GITHUB_API = 'https://api.github.com';
 
@@ -27,14 +28,17 @@ export class GithubService {
    *  1. Retry-After header (seconds) — present on secondary rate limit responses.
    *  2. X-RateLimit-Reset header (Unix seconds) — present when x-ratelimit-remaining is 0.
    *  3. Fallback: now + 60 seconds. */
-  private handleRateLimit(response: Response): void {
+  private handleRateLimit(response: Response, repo: string): void {
     if (response.status !== 429 && response.status !== 403) return;
 
     const retryAfter = response.headers.get('Retry-After');
     if (retryAfter) {
-      throw new GitHubRateLimitError(
-        new Date(Date.now() + Number(retryAfter) * 1000),
+      const resetAt = new Date(Date.now() + Number(retryAfter) * 1000);
+      logger.warn(
+        { event: 'github.rate_limit', repo, status: response.status, resetAt },
+        'GitHub rate limit hit (Retry-After)',
       );
+      throw new GitHubRateLimitError(resetAt);
     }
 
     const resetHeader = response.headers.get('X-RateLimit-Reset');
@@ -42,6 +46,10 @@ export class GithubService {
       ? new Date(Number(resetHeader) * 1000)
       : new Date(Date.now() + 60_000);
 
+    logger.warn(
+      { event: 'github.rate_limit', repo, status: response.status, resetAt },
+      'GitHub rate limit hit (X-RateLimit-Reset)',
+    );
     throw new GitHubRateLimitError(resetAt);
   }
 
@@ -49,15 +57,26 @@ export class GithubService {
    *  Throws GitHubRateLimitError on 403 or 429 (primary or secondary rate limit),
    *  generic Error on any other unexpected status. */
   async repositoryExists(repo: string): Promise<boolean> {
+    logger.debug(
+      { event: 'github.repo_check', repo },
+      'Checking repo existence',
+    );
+
     const response = await fetch(`${GITHUB_API}/repos/${repo}`, {
       method: 'GET',
       headers: this.headers,
     });
 
-    if (response.status === 200) return true;
-    if (response.status === 404) return false;
+    if (response.status === 200) {
+      logger.debug({ event: 'github.repo_found', repo }, 'Repo exists');
+      return true;
+    }
+    if (response.status === 404) {
+      logger.debug({ event: 'github.repo_not_found', repo }, 'Repo not found');
+      return false;
+    }
 
-    this.handleRateLimit(response);
+    this.handleRateLimit(response, repo);
 
     throw new Error(
       `GitHub API returned unexpected status ${response.status} for repo "${repo}"`,
@@ -68,6 +87,11 @@ export class GithubService {
    *  Throws GitHubRateLimitError on 403 or 429 (primary or secondary rate limit),
    *  generic Error on any other unexpected status. */
   async getLatestRelease(repo: string): Promise<Release | null> {
+    logger.debug(
+      { event: 'github.release_fetch', repo },
+      'Fetching latest release',
+    );
+
     const response = await fetch(
       `${GITHUB_API}/repos/${repo}/releases/latest`,
       {
@@ -76,16 +100,26 @@ export class GithubService {
       },
     );
 
-    if (response.status === 404) return null;
+    if (response.status === 404) {
+      logger.debug(
+        { event: 'github.release_not_found', repo },
+        'No releases found',
+      );
+      return null;
+    }
     if (response.status === 200) {
       const data = (await response.json()) as {
         tag_name: string;
         html_url: string;
       };
+      logger.debug(
+        { event: 'github.release_fetched', repo, tag: data.tag_name },
+        'Latest release fetched',
+      );
       return { tag_name: data.tag_name, html_url: data.html_url };
     }
 
-    this.handleRateLimit(response);
+    this.handleRateLimit(response, repo);
 
     throw new Error(
       `GitHub API returned unexpected status ${response.status} for releases of "${repo}"`,
