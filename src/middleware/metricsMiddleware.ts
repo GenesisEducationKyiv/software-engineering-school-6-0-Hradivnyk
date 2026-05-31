@@ -1,7 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 
 import {
-  httpErrorsTotal,
   httpRequestDurationSeconds,
   httpRequestsTotal,
 } from '../metrics/index.js';
@@ -40,9 +39,6 @@ export function metricsMiddleware(
     };
     httpRequestsTotal.inc(labels);
     httpRequestDurationSeconds.observe(labels, durationSeconds);
-    if (res.statusCode >= 400) {
-      httpErrorsTotal.inc(labels);
-    }
   });
 
   next();

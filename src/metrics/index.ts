@@ -19,14 +19,6 @@ export const httpRequestDurationSeconds = new client.Histogram({
   registers: [register],
 });
 
-// RED: Errors — explicit counter for 4xx/5xx responses
-export const httpErrorsTotal = new client.Counter({
-  name: 'http_errors_total',
-  help: 'Total number of HTTP error responses (4xx and 5xx)',
-  labelNames: ['method', 'route', 'status_code'] as const,
-  registers: [register],
-});
-
 export const subscriptionOperationsTotal = new client.Counter({
   name: 'subscription_operations_total',
   help: 'Subscription operations by type and result',
