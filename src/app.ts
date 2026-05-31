@@ -11,6 +11,7 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import logger from './utils/logger.js';
 import { pinoHttp } from 'pino-http';
+import { requestContext } from './utils/requestContext.js';
 import { config } from './config/index.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -38,10 +39,16 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
+// Establish requestId in AsyncLocalStorage before pinoHttp so service-layer
+// logs automatically include the same ID without explicit propagation.
+app.use((_req, _res, next) => {
+  requestContext.run(randomUUID(), next);
+});
+
 app.use(
   pinoHttp({
     logger,
-    genReqId: () => randomUUID(),
+    genReqId: () => requestContext.getStore() ?? randomUUID(),
     customAttributeKeys: { reqId: 'requestId' },
   }),
 );
