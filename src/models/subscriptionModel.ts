@@ -1,4 +1,4 @@
-import knex from '../db/knex.js';
+import type { Knex } from 'knex';
 import type { Subscription } from '../types.js';
 import type { IRepositoryModel } from './repositoryModel.js';
 
@@ -30,7 +30,10 @@ export interface ISubscriptionModel {
 }
 
 export class SubscriptionModel implements ISubscriptionModel {
-  constructor(private readonly repositoryModel: IRepositoryModel) {}
+  constructor(
+    private readonly db: Knex,
+    private readonly repositoryModel: IRepositoryModel,
+  ) {}
 
   // Ensures the repository exists, then inserts a new pending subscription with both tokens.
   async create(
@@ -40,7 +43,7 @@ export class SubscriptionModel implements ISubscriptionModel {
     unsubscribeToken: string,
   ): Promise<void> {
     await this.repositoryModel.upsert(repo);
-    await knex('subscriptions').insert({
+    await this.db('subscriptions').insert({
       email,
       repo,
       confirm_token: confirmToken,
@@ -51,7 +54,7 @@ export class SubscriptionModel implements ISubscriptionModel {
 
   // Returns true if a subscription for the given email and repo already exists.
   async existsByEmailAndRepo(email: string, repo: string): Promise<boolean> {
-    const row: unknown = await knex('subscriptions')
+    const row: unknown = await this.db('subscriptions')
       .where({ email, repo })
       .first();
     return row !== undefined;
@@ -59,7 +62,7 @@ export class SubscriptionModel implements ISubscriptionModel {
 
   // Sets subscription status to confirmed. Returns false if the token was not found.
   async confirm(confirmToken: string): Promise<boolean> {
-    const count = await knex('subscriptions')
+    const count = await this.db('subscriptions')
       .where({ confirm_token: confirmToken })
       .update({ status: 'confirmed' });
     return count > 0;
@@ -67,7 +70,7 @@ export class SubscriptionModel implements ISubscriptionModel {
 
   // Deletes the subscription by its unsubscribe token. Returns false if not found.
   async deleteByUnsubscribeToken(unsubscribeToken: string): Promise<boolean> {
-    const count = await knex('subscriptions')
+    const count = await this.db('subscriptions')
       .where({ unsubscribe_token: unsubscribeToken })
       .delete();
     return count > 0;
@@ -77,7 +80,7 @@ export class SubscriptionModel implements ISubscriptionModel {
   async findAllConfirmedWithTokens(): Promise<
     ConfirmedSubscriptionWithToken[]
   > {
-    return knex('subscriptions')
+    return this.db('subscriptions')
       .join('repositories', 'subscriptions.repo', 'repositories.repo')
       .where('subscriptions.status', 'confirmed')
       .select(
@@ -90,7 +93,7 @@ export class SubscriptionModel implements ISubscriptionModel {
 
   // Returns all confirmed subscriptions for the given email, including last seen release tag.
   async findByEmail(email: string): Promise<Subscription[]> {
-    const rows: SubscriptionRow[] = await knex('subscriptions')
+    const rows: SubscriptionRow[] = await this.db('subscriptions')
       .join('repositories', 'subscriptions.repo', 'repositories.repo')
       .where({
         'subscriptions.email': email,

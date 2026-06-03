@@ -1,3 +1,4 @@
+import knex from './db/knex.js';
 import { RepositoryModel } from './models/repositoryModel.js';
 import { SubscriptionModel } from './models/subscriptionModel.js';
 import { EmailService } from './services/emailService.js';
@@ -11,8 +12,8 @@ import { SubscriptionController } from './controllers/subscriptionController.js'
 import { config } from './config/index.js';
 import logger from './utils/logger.js';
 
-const repositoryModel = new RepositoryModel();
-const subscriptionModel = new SubscriptionModel(repositoryModel);
+const repositoryModel = new RepositoryModel(knex);
+const subscriptionModel = new SubscriptionModel(knex, repositoryModel);
 const emailSender = new NodemailerEmailSender({
   host: config.email.host,
   port: config.email.port,
