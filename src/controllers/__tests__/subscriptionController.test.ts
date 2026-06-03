@@ -6,7 +6,7 @@ import {
   TokenNotFoundError,
 } from '../../errors.js';
 import { SubscriptionController } from '../subscriptionController.js';
-import type { ISubscriptionService } from '../../services/subscriptionService.js';
+import type { ISubscriptionService } from '../../interfaces/ISubscriptionService.js';
 
 const VALID_TOKEN = 'a'.repeat(64);
 const EMAIL = 'user@example.com';
