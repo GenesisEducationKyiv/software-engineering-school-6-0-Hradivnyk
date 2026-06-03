@@ -1,6 +1,6 @@
 import request from 'supertest';
 import app from '../../src/app.js';
-import type { ISubscriptionService } from '../../src/services/subscriptionService.js';
+import type { ISubscriptionService } from '../../src/interfaces/ISubscriptionService.js';
 import {
   DuplicateSubscriptionError,
   RepositoryNotFoundError,
