@@ -3,7 +3,7 @@ import js from '@eslint/js';
 import prettierConfig from 'eslint-config-prettier';
 import nodePlugin from 'eslint-plugin-n';
 import securityPlugin from 'eslint-plugin-security';
-import importPlugin from 'eslint-plugin-import';
+import importPlugin from 'eslint-plugin-import-x';
 import globals from 'globals';
 
 export default tseslint.config(
