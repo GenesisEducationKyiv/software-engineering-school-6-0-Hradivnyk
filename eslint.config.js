@@ -3,6 +3,7 @@ import js from '@eslint/js';
 import prettierConfig from 'eslint-config-prettier';
 import nodePlugin from 'eslint-plugin-n';
 import securityPlugin from 'eslint-plugin-security';
+import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 
 export default tseslint.config(
@@ -17,6 +18,7 @@ export default tseslint.config(
     plugins: {
       n: nodePlugin,
       security: securityPlugin,
+      import: importPlugin,
     },
     languageOptions: {
       parserOptions: {
@@ -57,6 +59,9 @@ export default tseslint.config(
       'security/detect-non-literal-regexp': 'warn',
       'security/detect-non-literal-fs-filename': 'warn',
       'security/detect-eval-with-expression': 'error',
+
+      'import/first': 'error',
+      'import/no-duplicates': 'error',
     },
   },
 
