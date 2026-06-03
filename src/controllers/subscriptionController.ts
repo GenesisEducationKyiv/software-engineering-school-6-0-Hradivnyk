@@ -4,7 +4,7 @@ import {
   tokenSchema,
   emailQuerySchema,
 } from '../schemas/subscriptionSchemas.js';
-import type { ISubscriptionService } from '../services/subscriptionService.js';
+import type { ISubscriptionService } from '../interfaces/ISubscriptionService.js';
 
 export class SubscriptionController {
   constructor(private readonly subscriptionService: ISubscriptionService) {}

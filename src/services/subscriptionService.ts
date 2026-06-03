@@ -10,13 +10,7 @@ import type { ISubscriptionModel } from '../models/subscriptionModel.js';
 import type { IEmailService } from './emailService.js';
 import type { IGithubService } from './githubService.js';
 import { isValidToken } from '../utils/token.js';
-
-export interface ISubscriptionService {
-  subscribe(email: string, repo: string): Promise<void>;
-  confirm(token: string): Promise<void>;
-  unsubscribe(token: string): Promise<void>;
-  getSubscriptions(email: string): Promise<Subscription[]>;
-}
+import type { ISubscriptionService } from '../interfaces/ISubscriptionService.js';
 
 export class SubscriptionService implements ISubscriptionService {
   constructor(
