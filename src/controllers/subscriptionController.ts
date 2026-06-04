@@ -1,19 +1,14 @@
 import type { Request, Response, NextFunction } from 'express';
-import { ZodError } from 'zod';
-import { subscriptionService } from '../services/subscriptionService.js';
-import {
-  InvalidTokenError,
-  RepositoryNotFoundError,
-  DuplicateSubscriptionError,
-  TokenNotFoundError,
-} from '../errors.js';
 import {
   subscribeSchema,
   tokenSchema,
   emailQuerySchema,
 } from '../schemas/subscriptionSchemas.js';
+import type { ISubscriptionService } from '../interfaces/ISubscriptionService.js';
 
 export class SubscriptionController {
+  constructor(private readonly subscriptionService: ISubscriptionService) {}
+
   async subscribe(
     req: Request,
     res: Response,
@@ -21,24 +16,11 @@ export class SubscriptionController {
   ): Promise<void> {
     try {
       const { email, repo } = subscribeSchema.parse(req.body);
-
-      await subscriptionService.subscribe(email, repo);
+      await this.subscriptionService.subscribe(email, repo);
       res
         .status(200)
         .json({ message: 'Subscription successful. Confirmation email sent.' });
     } catch (err) {
-      if (err instanceof ZodError) {
-        res.status(400).json({ error: err.issues[0].message });
-        return;
-      }
-      if (err instanceof RepositoryNotFoundError) {
-        res.status(404).json({ error: err.message });
-        return;
-      }
-      if (err instanceof DuplicateSubscriptionError) {
-        res.status(409).json({ error: err.message });
-        return;
-      }
       next(err);
     }
   }
@@ -50,22 +32,9 @@ export class SubscriptionController {
   ): Promise<void> {
     try {
       const { token } = tokenSchema.parse(req.params);
-
-      await subscriptionService.confirm(token);
+      await this.subscriptionService.confirm(token);
       res.status(200).json({ message: 'Subscription confirmed successfully.' });
     } catch (err) {
-      if (err instanceof ZodError) {
-        res.status(400).json({ error: err.issues[0].message });
-        return;
-      }
-      if (err instanceof InvalidTokenError) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      if (err instanceof TokenNotFoundError) {
-        res.status(404).json({ error: err.message });
-        return;
-      }
       next(err);
     }
   }
@@ -77,22 +46,9 @@ export class SubscriptionController {
   ): Promise<void> {
     try {
       const { token } = tokenSchema.parse(req.params);
-
-      await subscriptionService.unsubscribe(token);
+      await this.subscriptionService.unsubscribe(token);
       res.status(200).json({ message: 'Unsubscribed successfully.' });
     } catch (err) {
-      if (err instanceof ZodError) {
-        res.status(400).json({ error: err.issues[0].message });
-        return;
-      }
-      if (err instanceof InvalidTokenError) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      if (err instanceof TokenNotFoundError) {
-        res.status(404).json({ error: err.message });
-        return;
-      }
       next(err);
     }
   }
@@ -104,17 +60,11 @@ export class SubscriptionController {
   ): Promise<void> {
     try {
       const { email } = emailQuerySchema.parse(req.query);
-
-      const subscriptions = await subscriptionService.getSubscriptions(email);
+      const subscriptions =
+        await this.subscriptionService.getSubscriptions(email);
       res.status(200).json(subscriptions);
     } catch (err) {
-      if (err instanceof ZodError) {
-        res.status(400).json({ error: err.issues[0].message });
-        return;
-      }
       next(err);
     }
   }
 }
-
-export const subscriptionController = new SubscriptionController();

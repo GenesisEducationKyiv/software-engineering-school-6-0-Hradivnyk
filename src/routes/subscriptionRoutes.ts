@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { subscriptionController } from '../controllers/subscriptionController.js';
+import { subscriptionController } from '../container.js';
 import { apiKeyAuth } from '../middleware/apiKeyAuth.js';
 
 const router = Router();

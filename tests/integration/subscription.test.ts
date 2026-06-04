@@ -1,6 +1,6 @@
 import request from 'supertest';
 import app from '../../src/app.js';
-import { subscriptionService } from '../../src/services/subscriptionService.js';
+import type { ISubscriptionService } from '../../src/interfaces/ISubscriptionService.js';
 import {
   DuplicateSubscriptionError,
   RepositoryNotFoundError,
@@ -9,9 +9,39 @@ import {
 import type { Subscription } from '../../src/types.js';
 
 jest.mock('../../src/db/knex.js', () => ({}));
-jest.mock('../../src/services/subscriptionService.js');
 
-const mockedService = jest.mocked(subscriptionService);
+// Provide a real SubscriptionController wired to a mock service so that
+// the full HTTP layer (validation, error handling) is exercised as-is.
+jest.mock('../../src/container.js', () => {
+  // Typed destructuring (not an `as` assertion) — survives eslint --fix
+  // no-unsafe-assignment is off for test files, so assigning `any` to a typed
+  // variable is allowed.
+  const {
+    SubscriptionController,
+  }: typeof import('../../src/controllers/subscriptionController.js') =
+    jest.requireActual('../../src/controllers/subscriptionController.js');
+
+  const service: { [K in keyof ISubscriptionService]: jest.Mock } = {
+    subscribe: jest.fn(),
+    confirm: jest.fn(),
+    unsubscribe: jest.fn(),
+    getSubscriptions: jest.fn(),
+  };
+
+  return {
+    subscriptionController: new SubscriptionController(service),
+    scannerService: { scan: jest.fn() },
+    _mockService: service,
+  };
+});
+
+type MockService = { [K in keyof ISubscriptionService]: jest.Mock };
+
+// Typed declaration (not `as` assertion) — no-unsafe-assignment/member-access
+// are off in test files, so reading `any._mockService` into MockService is fine.
+const mockedService: MockService = jest.requireMock(
+  '../../src/container.js',
+)._mockService;
 
 const VALID_TOKEN = 'a'.repeat(64);
 const EMAIL = 'user@example.com';
