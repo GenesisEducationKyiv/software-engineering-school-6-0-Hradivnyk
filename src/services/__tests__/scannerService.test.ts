@@ -1,19 +1,9 @@
-import cron from 'node-cron';
-import { subscriptionModel } from '../../models/subscriptionModel.js';
-import { emailService } from '../emailService.js';
-import { githubService } from '../githubService.js';
+import type { ISubscriptionModel } from '../../models/subscriptionModel.js';
+import type { IRepositoryModel } from '../../models/repositoryModel.js';
+import type { IEmailService } from '../emailService.js';
+import type { IGithubService } from '../githubService.js';
+import type { ILogger } from '../../utils/logger.js';
 import { ScannerService } from '../scannerService.js';
-
-jest.mock('../../db/knex.js', () => ({}));
-jest.mock('../githubService.js');
-jest.mock('../emailService.js');
-jest.mock('../../models/subscriptionModel.js');
-jest.mock('node-cron');
-
-const mockedGithubService = jest.mocked(githubService);
-const mockedEmailService = jest.mocked(emailService);
-const mockedModel = jest.mocked(subscriptionModel);
-const mockedCron = jest.mocked(cron);
 
 const REPO_A = 'owner/repo-a';
 const REPO_B = 'owner/repo-b';
@@ -35,61 +25,98 @@ function makeSubscriber(
 describe('ScannerService', () => {
   let service: ScannerService;
 
+  // Typed as plain {method: jest.Mock} objects to avoid jest.Mocked<T> resolution
+  // issues in ESLint when interface comes from a newly added module.
+  let mockModel: { [K in keyof ISubscriptionModel]: jest.Mock };
+  let mockRepositoryModel: { [K in keyof IRepositoryModel]: jest.Mock };
+  let mockEmailService: { [K in keyof IEmailService]: jest.Mock };
+  let mockGithubService: { [K in keyof IGithubService]: jest.Mock };
+  let mockLogger: { [K in keyof ILogger]: jest.Mock };
+
   beforeEach(() => {
-    service = new ScannerService();
-    jest.clearAllMocks();
-    mockedEmailService.sendNotificationEmail.mockResolvedValue(undefined);
-    mockedModel.updateLastSeenTag.mockResolvedValue(undefined);
+    mockModel = {
+      create: jest.fn(),
+      existsByEmailAndRepo: jest.fn(),
+      confirm: jest.fn(),
+      deleteByUnsubscribeToken: jest.fn(),
+      findAllConfirmedWithTokens: jest.fn(),
+      findByEmail: jest.fn(),
+    };
+    mockRepositoryModel = {
+      upsert: jest.fn(),
+      updateLastSeenTag: jest.fn().mockResolvedValue(undefined),
+    };
+    mockEmailService = {
+      sendConfirmationEmail: jest.fn(),
+      sendNotificationEmail: jest.fn().mockResolvedValue(undefined),
+    };
+    mockGithubService = {
+      repositoryExists: jest.fn(),
+      getLatestRelease: jest.fn(),
+    };
+    mockLogger = {
+      info: jest.fn(),
+      debug: jest.fn(),
+      error: jest.fn(),
+    };
+
+    service = new ScannerService(
+      mockModel,
+      mockRepositoryModel,
+      mockEmailService,
+      mockGithubService,
+      mockLogger,
+    );
   });
 
   describe('scan', () => {
     it('should not send any emails if there are no active subscriptions', async () => {
-      mockedModel.findAllConfirmedWithTokens.mockResolvedValue([]);
+      mockModel.findAllConfirmedWithTokens.mockResolvedValue([]);
 
       await service.scan();
 
-      expect(mockedGithubService.getLatestRelease).not.toHaveBeenCalled();
-      expect(mockedEmailService.sendNotificationEmail).not.toHaveBeenCalled();
+      expect(mockGithubService.getLatestRelease).not.toHaveBeenCalled();
+      expect(mockEmailService.sendNotificationEmail).not.toHaveBeenCalled();
     });
 
     it('should fetch the latest release for each unique repository in active subscriptions', async () => {
-      mockedModel.findAllConfirmedWithTokens.mockResolvedValue([
+      mockModel.findAllConfirmedWithTokens.mockResolvedValue([
         makeSubscriber(REPO_A, 'a@example.com', 'v1.0.0'),
         makeSubscriber(REPO_A, 'b@example.com', 'v1.0.0'),
         makeSubscriber(REPO_B, 'c@example.com', 'v2.0.0'),
       ]);
-      mockedGithubService.getLatestRelease.mockResolvedValue({
+      mockGithubService.getLatestRelease.mockResolvedValue({
         tag_name: 'v1.0.0',
         html_url: 'https://github.com',
       });
 
       await service.scan();
 
-      expect(mockedGithubService.getLatestRelease).toHaveBeenCalledTimes(2);
-      expect(mockedGithubService.getLatestRelease).toHaveBeenCalledWith(REPO_A);
-      expect(mockedGithubService.getLatestRelease).toHaveBeenCalledWith(REPO_B);
+      expect(mockGithubService.getLatestRelease).toHaveBeenCalledTimes(2);
+      expect(mockGithubService.getLatestRelease).toHaveBeenCalledWith(REPO_A);
+      expect(mockGithubService.getLatestRelease).toHaveBeenCalledWith(REPO_B);
     });
 
     it('should send a notification email to each subscriber when a new release is detected', async () => {
-      mockedModel.findAllConfirmedWithTokens.mockResolvedValue([
+      mockModel.findAllConfirmedWithTokens.mockResolvedValue([
         makeSubscriber(REPO_A, 'a@example.com', 'v1.0.0', 'token-a'),
         makeSubscriber(REPO_A, 'b@example.com', 'v1.0.0', 'token-b'),
       ]);
-      mockedGithubService.getLatestRelease.mockResolvedValue({
+      mockGithubService.getLatestRelease.mockResolvedValue({
         tag_name: 'v2.0.0',
         html_url: 'https://github.com',
       });
 
       await service.scan();
 
-      expect(mockedEmailService.sendNotificationEmail).toHaveBeenCalledTimes(2);
-      expect(mockedEmailService.sendNotificationEmail).toHaveBeenCalledWith(
+      expect(mockEmailService.sendNotificationEmail).toHaveBeenCalledTimes(2);
+      expect(mockEmailService.sendNotificationEmail).toHaveBeenCalledWith(
         'a@example.com',
         REPO_A,
         'v2.0.0',
         'token-a',
       );
-      expect(mockedEmailService.sendNotificationEmail).toHaveBeenCalledWith(
+      expect(mockEmailService.sendNotificationEmail).toHaveBeenCalledWith(
         'b@example.com',
         REPO_A,
         'v2.0.0',
@@ -98,54 +125,54 @@ describe('ScannerService', () => {
     });
 
     it('should update last_seen_tag in the database after sending notifications', async () => {
-      mockedModel.findAllConfirmedWithTokens.mockResolvedValue([
+      mockModel.findAllConfirmedWithTokens.mockResolvedValue([
         makeSubscriber(REPO_A, 'a@example.com', 'v1.0.0'),
       ]);
-      mockedGithubService.getLatestRelease.mockResolvedValue({
+      mockGithubService.getLatestRelease.mockResolvedValue({
         tag_name: 'v2.0.0',
         html_url: 'https://github.com',
       });
 
       await service.scan();
 
-      expect(mockedModel.updateLastSeenTag).toHaveBeenCalledWith(
+      expect(mockRepositoryModel.updateLastSeenTag).toHaveBeenCalledWith(
         REPO_A,
         'v2.0.0',
       );
     });
 
     it('should not send a notification if the latest release matches last_seen_tag', async () => {
-      mockedModel.findAllConfirmedWithTokens.mockResolvedValue([
+      mockModel.findAllConfirmedWithTokens.mockResolvedValue([
         makeSubscriber(REPO_A, 'a@example.com', 'v1.0.0'),
       ]);
-      mockedGithubService.getLatestRelease.mockResolvedValue({
+      mockGithubService.getLatestRelease.mockResolvedValue({
         tag_name: 'v1.0.0',
         html_url: 'https://github.com',
       });
 
       await service.scan();
 
-      expect(mockedEmailService.sendNotificationEmail).not.toHaveBeenCalled();
-      expect(mockedModel.updateLastSeenTag).not.toHaveBeenCalled();
+      expect(mockEmailService.sendNotificationEmail).not.toHaveBeenCalled();
+      expect(mockRepositoryModel.updateLastSeenTag).not.toHaveBeenCalled();
     });
 
     it('should not send a notification if the repository has no releases', async () => {
-      mockedModel.findAllConfirmedWithTokens.mockResolvedValue([
+      mockModel.findAllConfirmedWithTokens.mockResolvedValue([
         makeSubscriber(REPO_A, 'a@example.com', null),
       ]);
-      mockedGithubService.getLatestRelease.mockResolvedValue(null);
+      mockGithubService.getLatestRelease.mockResolvedValue(null);
 
       await service.scan();
 
-      expect(mockedEmailService.sendNotificationEmail).not.toHaveBeenCalled();
+      expect(mockEmailService.sendNotificationEmail).not.toHaveBeenCalled();
     });
 
     it('should continue processing remaining repos if one GitHub API call fails', async () => {
-      mockedModel.findAllConfirmedWithTokens.mockResolvedValue([
+      mockModel.findAllConfirmedWithTokens.mockResolvedValue([
         makeSubscriber(REPO_A, 'a@example.com', 'v1.0.0'),
         makeSubscriber(REPO_B, 'b@example.com', 'v1.0.0'),
       ]);
-      mockedGithubService.getLatestRelease
+      mockGithubService.getLatestRelease
         .mockRejectedValueOnce(new Error('GitHub API error'))
         .mockResolvedValueOnce({
           tag_name: 'v2.0.0',
@@ -154,35 +181,13 @@ describe('ScannerService', () => {
 
       await service.scan();
 
-      expect(mockedGithubService.getLatestRelease).toHaveBeenCalledTimes(2);
-      expect(mockedEmailService.sendNotificationEmail).toHaveBeenCalledTimes(1);
-      expect(mockedEmailService.sendNotificationEmail).toHaveBeenCalledWith(
+      expect(mockGithubService.getLatestRelease).toHaveBeenCalledTimes(2);
+      expect(mockEmailService.sendNotificationEmail).toHaveBeenCalledTimes(1);
+      expect(mockEmailService.sendNotificationEmail).toHaveBeenCalledWith(
         'b@example.com',
         REPO_B,
         'v2.0.0',
         expect.any(String),
-      );
-    });
-  });
-
-  describe('start', () => {
-    it('should throw an Error when the cron expression is invalid', () => {
-      mockedCron.validate.mockReturnValue(false);
-
-      expect(() => service.start()).toThrow(/Invalid cron schedule/);
-    });
-
-    it('should call cron.schedule with the configured schedule when the expression is valid', () => {
-      mockedCron.validate.mockReturnValue(true);
-      mockedCron.schedule.mockReturnValue(
-        {} as ReturnType<typeof cron.schedule>,
-      );
-
-      service.start();
-
-      expect(mockedCron.schedule).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.any(Function),
       );
     });
   });

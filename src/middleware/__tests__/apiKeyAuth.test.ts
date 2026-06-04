@@ -1,12 +1,25 @@
 import type { Request, Response, NextFunction } from 'express';
 import { apiKeyAuth } from '../apiKeyAuth.js';
 import { UnauthorizedError } from '../../errors.js';
+import { config } from '../../config/index.js';
+
+jest.mock('../../config/index.js', () => ({
+  config: {
+    auth: { apiKey: '' },
+  },
+}));
+
+// Cast away readonly so beforeEach can switch the key between scenarios.
+// The mock object is not truly const, so mutation works at runtime.
+const mutableConfig = config as { auth: { apiKey: string } };
 
 function mockReq(headers: Record<string, string> = {}): Request {
   return { headers } as unknown as Request;
 }
 
 const mockRes = {} as Response;
+
+const CONFIGURED_KEY = 'test-api-key';
 
 describe('apiKeyAuth middleware', () => {
   let next: jest.MockedFunction<NextFunction>;
@@ -17,31 +30,25 @@ describe('apiKeyAuth middleware', () => {
 
   describe('when API_KEY is not configured', () => {
     beforeEach(() => {
-      process.env.API_KEY = '';
+      mutableConfig.auth.apiKey = '';
     });
 
-    afterEach(() => {
-      process.env.API_KEY = 'test-api-key';
-    });
-
-    it('should call next() without error when no header is provided', () => {
+    it('should call next(UnauthorizedError) when no header is provided', () => {
       apiKeyAuth(mockReq(), mockRes, next);
 
-      expect(next).toHaveBeenCalledWith();
+      expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
     });
 
-    it('should call next() without error even with a wrong key', () => {
+    it('should call next(UnauthorizedError) even with a key provided', () => {
       apiKeyAuth(mockReq({ 'x-api-key': 'anything' }), mockRes, next);
 
-      expect(next).toHaveBeenCalledWith();
+      expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
     });
   });
 
   describe('when API_KEY is configured', () => {
-    const CONFIGURED_KEY = 'test-api-key';
-
     beforeEach(() => {
-      process.env.API_KEY = CONFIGURED_KEY;
+      mutableConfig.auth.apiKey = CONFIGURED_KEY;
     });
 
     it('should call next() when the correct key is provided', () => {
