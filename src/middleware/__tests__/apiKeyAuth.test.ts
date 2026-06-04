@@ -33,16 +33,16 @@ describe('apiKeyAuth middleware', () => {
       mutableConfig.auth.apiKey = '';
     });
 
-    it('should call next() without error when no header is provided', () => {
+    it('should call next(UnauthorizedError) when no header is provided', () => {
       apiKeyAuth(mockReq(), mockRes, next);
 
-      expect(next).toHaveBeenCalledWith();
+      expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
     });
 
-    it('should call next() without error even with a wrong key', () => {
+    it('should call next(UnauthorizedError) even with a key provided', () => {
       apiKeyAuth(mockReq({ 'x-api-key': 'anything' }), mockRes, next);
 
-      expect(next).toHaveBeenCalledWith();
+      expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
     });
   });
 
