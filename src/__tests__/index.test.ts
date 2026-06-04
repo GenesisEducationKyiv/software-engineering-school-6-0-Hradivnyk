@@ -17,6 +17,11 @@ jest.mock('../utils/logger.js', () => ({
   __esModule: true,
   default: { info: jest.fn(), error: jest.fn() },
 }));
+jest.mock('../config/index.js', () => ({
+  config: {
+    scanner: { cronSchedule: '30 6 * * *' },
+  },
+}));
 
 describe('index startup', () => {
   beforeEach(() => {
@@ -46,8 +51,9 @@ describe('index startup', () => {
 
     await import('../index.js');
 
+    const { config } = await import('../config/index.js');
     expect(jest.mocked(cron).schedule).toHaveBeenCalledWith(
-      '0 * * * *',
+      config.scanner.cronSchedule,
       expect.any(Function),
     );
   });
