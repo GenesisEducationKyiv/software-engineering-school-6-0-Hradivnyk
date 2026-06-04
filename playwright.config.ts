@@ -15,7 +15,23 @@ export default defineConfig({
     baseURL,
     trace: 'on-first-retry',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    // UI tests: all routes are mocked via page.route() — safe to run in parallel.
+    {
+      name: 'ui',
+      testMatch: /home\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    // Full-stack E2E tests: hit the real DB, must run serially to avoid
+    // shared-data conflicts (duplicate email/repo across concurrent workers).
+    {
+      name: 'e2e',
+      testMatch: /\.e2e\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+      fullyParallel: false,
+      workers: 1,
+    },
+  ],
   ...(skipWebServer
     ? {}
     : {
