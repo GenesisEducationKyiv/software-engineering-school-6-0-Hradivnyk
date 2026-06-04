@@ -6,6 +6,7 @@ import type { IRepositoryModel } from '../models/repositoryModel.js';
 import type { ILogger } from '../utils/logger.js';
 import type { IEmailService } from './emailService.js';
 import type { IGithubService } from './githubService.js';
+import { GitHubRateLimitError } from '../errors.js';
 
 function groupByRepo(
   subscriptions: ConfirmedSubscriptionWithToken[],
@@ -55,26 +56,32 @@ export class ScannerService {
         'Scanner: new release detected, sending notifications',
       );
 
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         subscribers.map(async (sub) =>
-          this.emailService
-            .sendNotificationEmail(
-              sub.email,
-              repo,
-              release.tag_name,
-              sub.unsubscribe_token,
-            )
-            .catch((err: unknown) => {
-              this.logger.error(
-                { err, email: sub.email, repo },
-                'Scanner: failed to send notification email',
-              );
-            }),
+          this.emailService.sendNotificationEmail(
+            sub.email,
+            repo,
+            release.tag_name,
+            sub.unsubscribe_token,
+          ),
         ),
       );
 
+      const failures = results.filter(
+        (r): r is PromiseRejectedResult => r.status === 'rejected',
+      );
+      for (const failure of failures) {
+        this.logger.error(
+          { err: failure.reason as unknown, repo },
+          'Scanner: failed to send notification email',
+        );
+      }
+
+      if (failures.length > 0) return;
+
       await this.repositoryModel.updateLastSeenTag(repo, release.tag_name);
     } catch (err) {
+      if (err instanceof GitHubRateLimitError) throw err;
       this.logger.error({ err, repo }, 'Scanner: error processing repo');
     }
   }
