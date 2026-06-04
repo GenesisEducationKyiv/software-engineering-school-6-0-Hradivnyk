@@ -58,6 +58,7 @@ export class GithubService implements IGithubService {
     const response = await this.httpClient.get(
       `${GITHUB_API}/repos/${repo}`,
       this.headers,
+      { timeoutMs: 10_000 },
     );
 
     if (response.status === 200) return true;
@@ -77,6 +78,7 @@ export class GithubService implements IGithubService {
     const response = await this.httpClient.get(
       `${GITHUB_API}/repos/${repo}/releases/latest`,
       this.headers,
+      { timeoutMs: 10_000 },
     );
 
     if (response.status === 404) return null;
