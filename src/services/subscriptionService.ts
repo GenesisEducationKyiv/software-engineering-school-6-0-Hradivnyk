@@ -32,13 +32,13 @@ export class SubscriptionService implements ISubscriptionService {
     const confirmToken = crypto.randomBytes(32).toString('hex');
     const unsubscribeToken = crypto.randomBytes(32).toString('hex');
 
+    await this.emailService.sendConfirmationEmail(email, confirmToken, repo);
     await this.subscriptionModel.create(
       email,
       repo,
       confirmToken,
       unsubscribeToken,
     );
-    await this.emailService.sendConfirmationEmail(email, confirmToken, repo);
   }
 
   async confirm(token: string): Promise<void> {
