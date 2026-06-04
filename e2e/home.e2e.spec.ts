@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { fillAndSubmit } from './helpers';
+import { fillAndSubmit } from './helpers.js';
 
 const VALID_REPO = 'golang/go';
 const VALID_EMAIL = 'test@example.com';
