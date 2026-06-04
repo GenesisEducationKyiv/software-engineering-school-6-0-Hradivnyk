@@ -18,6 +18,15 @@
  */
 
 const { execSync } = require('child_process');
+const path = require('path');
+
+// Prepend node_modules/.bin to PATH so local devDependency binaries (e.g.
+// `jest`, `playwright`) are resolved before any globally installed packages.
+// execSync spawns a new shell that does not inherit the PATH augmentation npm
+// adds when running package.json scripts, so without this the shell would pick
+// up a wrong global binary or fail with "command not found".
+const localBin = path.join(__dirname, '..', 'node_modules', '.bin');
+process.env.PATH = `${localBin}${path.delimiter}${process.env.PATH}`;
 
 // Split argv on '--': everything before is compose flags, everything after is
 // the test command.
@@ -26,12 +35,25 @@ const separatorIndex = args.indexOf('--');
 
 if (separatorIndex === -1) {
   console.error(
-    'Usage: node run-with-compose.cjs <compose-flags> -- <test-command>',
+    'Usage: node run-with-compose.cjs <compose-flags> [--env KEY=VALUE ...] -- <test-command>',
   );
   process.exit(1);
 }
 
-const composeFlags = args.slice(0, separatorIndex).join(' ');
+// Parse --env KEY=VALUE flags from the compose section and apply them to the
+// current process so the test command inherits them (cross-platform, no deps).
+const rawComposeArgs = args.slice(0, separatorIndex);
+const composeFlagParts = [];
+for (let i = 0; i < rawComposeArgs.length; i++) {
+  if (rawComposeArgs[i] === '--env' && i + 1 < rawComposeArgs.length) {
+    const [key, ...rest] = rawComposeArgs[++i].split('=');
+    process.env[key] = rest.join('=');
+  } else {
+    composeFlagParts.push(rawComposeArgs[i]);
+  }
+}
+
+const composeFlags = composeFlagParts.join(' ');
 const testCommand = args.slice(separatorIndex + 1).join(' ');
 const compose = `docker compose ${composeFlags}`;
 

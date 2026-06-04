@@ -1,15 +1,15 @@
 import request from 'supertest';
 import app from '../../src/app.js';
 import knex from '../../src/db/knex.js';
-import { githubService } from '../../src/services/githubService.js';
-import { emailService } from '../../src/services/emailService.js';
-import { subscriptionModel } from '../../src/models/subscriptionModel.js';
+import { GithubService } from '../../src/services/githubService.js';
+import { EmailService } from '../../src/services/emailService.js';
+import { subscriptionModel, repositoryModel } from '../../src/container.js';
 
 jest.mock('../../src/services/githubService.js');
 jest.mock('../../src/services/emailService.js');
 
-const mockedGithub = jest.mocked(githubService);
-const mockedEmail = jest.mocked(emailService);
+const mockedGithub = jest.mocked(GithubService).prototype;
+const mockedEmail = jest.mocked(EmailService).prototype;
 
 const EMAIL = 'integration@example.com';
 const REPO = 'owner/repo';
@@ -308,7 +308,7 @@ describe('subscriptionModel - scanner methods', () => {
     it('updates last_seen_tag for the repository', async () => {
       await subscribe();
 
-      await subscriptionModel.updateLastSeenTag(REPO, 'v3.0.0');
+      await repositoryModel.updateLastSeenTag(REPO, 'v3.0.0');
 
       const repo = await knex('repositories').where({ repo: REPO }).first();
       expect(repo.last_seen_tag).toBe('v3.0.0');

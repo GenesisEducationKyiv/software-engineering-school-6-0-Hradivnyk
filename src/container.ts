@@ -34,6 +34,8 @@ const subscriptionService = new SubscriptionService(
   githubService,
 );
 
+export { subscriptionModel, repositoryModel };
+
 export const scannerService = new ScannerService(
   subscriptionModel,
   repositoryModel,

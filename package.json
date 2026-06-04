@@ -34,7 +34,7 @@
     "test:integration:ci": "node scripts/run-with-compose.cjs -f docker-compose.test.yml -- jest --selectProjects integration --runInBand",
     "test:integration:coverage": "npm run test:integration:ci -- --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:ci": "node scripts/run-with-compose.cjs -p software-engineering-school-6-0-hradivnyk-e2e -f docker-compose.yml -f docker-compose.e2e.yml -- playwright test",
+    "test:e2e:ci": "node scripts/run-with-compose.cjs -p software-engineering-school-6-0-hradivnyk-e2e -f docker-compose.yml -f docker-compose.e2e.yml --env PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 --env PLAYWRIGHT_SKIP_WEBSERVER=1 -- playwright test",
     "test:e2e:ui": "playwright test --ui",
     "prepare": "node .husky/install.mjs"
   },
