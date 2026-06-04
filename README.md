@@ -169,6 +169,8 @@ docker run --rm caddy:2-alpine caddy hash-password --plaintext yourpassword
 
 ### Testing
 
+See [testing.md](testing.md) for full details on unit, integration, and E2E tests.
+
 ```bash
 npm test                  # all tests
 npm run test:unit         # unit tests only

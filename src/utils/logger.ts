@@ -4,6 +4,12 @@ import pino from 'pino';
 import { config } from '../config/index.js';
 import { requestContext } from './requestContext.js';
 
+export interface ILogger {
+  info(objOrMsg: object | string, msg?: string): void;
+  debug(objOrMsg: object | string, msg?: string): void;
+  error(objOrMsg: object | string, msg?: string): void;
+}
+
 const { name, version } = JSON.parse(
   readFileSync(join(process.cwd(), 'package.json'), 'utf-8'),
 ) as { name: string; version: string };

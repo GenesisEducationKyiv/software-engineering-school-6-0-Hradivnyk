@@ -1,25 +1,33 @@
 import { GitHubRateLimitError } from '../errors.js';
-import { config } from '../config/index.js';
 import { githubApiRequestsTotal } from '../metrics/index.js';
 import logger from '../utils/logger.js';
+import type { IHttpClient } from '../httpClient.js';
 
-const GITHUB_API = 'https://api.github.com';
+// GITHUB_API_URL can be overridden in tests to point to a local mock server
+// instead of the real GitHub API, avoiding external network calls in E2E.
+const GITHUB_API = process.env.GITHUB_API_URL ?? 'https://api.github.com';
 
 export interface Release {
   tag_name: string;
   html_url: string;
 }
 
-export class GithubService {
+export interface IGithubService {
+  repositoryExists(repo: string): Promise<boolean>;
+  getLatestRelease(repo: string): Promise<Release | null>;
+}
+
+export class GithubService implements IGithubService {
   private readonly headers: HeadersInit;
 
-  constructor() {
+  constructor(
+    private readonly httpClient: IHttpClient,
+    token?: string,
+  ) {
     this.headers = {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
-      ...(config.github.token
-        ? { Authorization: `Bearer ${config.github.token}` }
-        : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   }
 
@@ -69,10 +77,11 @@ export class GithubService {
       'Checking repo existence',
     );
 
-    const response = await fetch(`${GITHUB_API}/repos/${repo}`, {
-      method: 'GET',
-      headers: this.headers,
-    });
+    const response = await this.httpClient.get(
+      `${GITHUB_API}/repos/${repo}`,
+      this.headers,
+      { timeoutMs: 10_000 },
+    );
 
     if (response.status === 200) {
       logger.debug({ event: 'github.repo_found', repo }, 'Repo exists');
@@ -105,12 +114,10 @@ export class GithubService {
       'Fetching latest release',
     );
 
-    const response = await fetch(
+    const response = await this.httpClient.get(
       `${GITHUB_API}/repos/${repo}/releases/latest`,
-      {
-        method: 'GET',
-        headers: this.headers,
-      },
+      this.headers,
+      { timeoutMs: 10_000 },
     );
 
     if (response.status === 404) {
@@ -148,5 +155,3 @@ export class GithubService {
     );
   }
 }
-
-export const githubService = new GithubService();

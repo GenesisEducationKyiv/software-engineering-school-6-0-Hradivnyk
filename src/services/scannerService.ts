@@ -1,15 +1,20 @@
 import cron from 'node-cron';
 import { config } from '../config/index.js';
-import type { ConfirmedSubscriptionWithToken } from '../models/subscriptionModel.js';
-import { subscriptionModel } from '../models/subscriptionModel.js';
+import type {
+  ConfirmedSubscriptionWithToken,
+  ISubscriptionModel,
+} from '../models/subscriptionModel.js';
+import type { IRepositoryModel } from '../models/repositoryModel.js';
 import {
   scannerEmailsSentTotal,
   scannerReleasesDetectedTotal,
   scannerScanDurationSeconds,
 } from '../metrics/index.js';
 import logger from '../utils/logger.js';
-import { emailService } from './emailService.js';
-import { githubService } from './githubService.js';
+import type { ILogger } from '../utils/logger.js';
+import type { IEmailService } from './emailService.js';
+import type { IGithubService } from './githubService.js';
+import { GitHubRateLimitError } from '../errors.js';
 
 function groupByRepo(
   subscriptions: ConfirmedSubscriptionWithToken[],
@@ -24,15 +29,23 @@ function groupByRepo(
 }
 
 export class ScannerService {
+  constructor(
+    private readonly subscriptionModel: ISubscriptionModel,
+    private readonly repositoryModel: IRepositoryModel,
+    private readonly emailService: IEmailService,
+    private readonly githubService: IGithubService,
+    private readonly logger: ILogger,
+  ) {}
+
   private async processRepo(
     repo: string,
     subscribers: ConfirmedSubscriptionWithToken[],
   ): Promise<void> {
     try {
-      const release = await githubService.getLatestRelease(repo);
+      const release = await this.githubService.getLatestRelease(repo);
 
       if (!release) {
-        logger.debug(
+        this.logger.debug(
           { event: 'scanner.no_releases', repo },
           'No releases found',
         );
@@ -42,23 +55,23 @@ export class ScannerService {
       const lastSeenTag = subscribers[0].last_seen_tag;
 
       if (release.tag_name === lastSeenTag) {
-        logger.debug(
+        this.logger.debug(
           { event: 'scanner.no_new_release', repo, tag: release.tag_name },
           'No new release',
         );
         return;
       }
 
-      logger.info(
+      this.logger.info(
         { event: 'scanner.release_detected', repo, tag: release.tag_name },
         'New release detected',
       );
 
       scannerReleasesDetectedTotal.inc({ repo });
 
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         subscribers.map(async (sub) =>
-          emailService
+          this.emailService
             .sendNotificationEmail(
               sub.email,
               repo,
@@ -67,24 +80,30 @@ export class ScannerService {
             )
             .then(() => {
               scannerEmailsSentTotal.inc({ repo });
-            })
-            .catch((err: unknown) => {
-              logger.error(
-                {
-                  event: 'scanner.notification_failed',
-                  err,
-                  email: sub.email,
-                  repo,
-                },
-                'Failed to send notification email',
-              );
             }),
         ),
       );
 
-      await subscriptionModel.updateLastSeenTag(repo, release.tag_name);
+      const failures = results.filter(
+        (r): r is PromiseRejectedResult => r.status === 'rejected',
+      );
+      for (const failure of failures) {
+        this.logger.error(
+          {
+            event: 'scanner.notification_failed',
+            err: failure.reason as unknown,
+            repo,
+          },
+          'Failed to send notification email',
+        );
+      }
+
+      if (failures.length > 0) return;
+
+      await this.repositoryModel.updateLastSeenTag(repo, release.tag_name);
     } catch (err) {
-      logger.error(
+      if (err instanceof GitHubRateLimitError) throw err;
+      this.logger.error(
         { event: 'scanner.repo_error', err, repo },
         'Error processing repo',
       );
@@ -95,13 +114,16 @@ export class ScannerService {
     const endTimer = scannerScanDurationSeconds.startTimer();
     let result = 'success';
     try {
-      logger.info({ event: 'scanner.check_started' }, 'Starting release check');
+      this.logger.info(
+        { event: 'scanner.check_started' },
+        'Starting release check',
+      );
 
       const subscriptions =
-        await subscriptionModel.findAllConfirmedWithTokens();
+        await this.subscriptionModel.findAllConfirmedWithTokens();
 
       if (subscriptions.length === 0) {
-        logger.info(
+        this.logger.info(
           { event: 'scanner.no_subscriptions' },
           'No active subscriptions, skipping',
         );
@@ -115,7 +137,7 @@ export class ScannerService {
         await this.processRepo(repo, subscribers); // sequential to respect GitHub API rate limits
       }
 
-      logger.info(
+      this.logger.info(
         { event: 'scanner.check_complete' },
         'Release check complete',
       );
@@ -149,5 +171,3 @@ export class ScannerService {
     );
   }
 }
-
-export const scannerService = new ScannerService();

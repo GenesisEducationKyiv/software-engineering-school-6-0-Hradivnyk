@@ -1,5 +1,6 @@
-import knex from '../db/knex.js';
+import type { Knex } from 'knex';
 import type { Subscription } from '../types.js';
+import type { IRepositoryModel } from './repositoryModel.js';
 
 interface SubscriptionRow {
   email: string;
@@ -14,16 +15,39 @@ export interface ConfirmedSubscriptionWithToken {
   last_seen_tag: string | null;
 }
 
-export class SubscriptionModel {
-  // Upserts the repository and inserts a new pending subscription with both tokens.
+export interface ISubscriptionModel {
+  create(
+    email: string,
+    repo: string,
+    confirmToken: string,
+    unsubscribeToken: string,
+  ): Promise<void>;
+  existsByEmailAndRepo(email: string, repo: string): Promise<boolean>;
+  confirm(
+    confirmToken: string,
+  ): Promise<{ email: string; repo: string } | null>;
+  deleteByUnsubscribeToken(
+    unsubscribeToken: string,
+  ): Promise<{ email: string; repo: string } | null>;
+  findAllConfirmedWithTokens(): Promise<ConfirmedSubscriptionWithToken[]>;
+  findByEmail(email: string): Promise<Subscription[]>;
+}
+
+export class SubscriptionModel implements ISubscriptionModel {
+  constructor(
+    private readonly db: Knex,
+    private readonly repositoryModel: IRepositoryModel,
+  ) {}
+
+  // Ensures the repository exists, then inserts a new pending subscription with both tokens.
   async create(
     email: string,
     repo: string,
     confirmToken: string,
     unsubscribeToken: string,
   ): Promise<void> {
-    await knex('repositories').insert({ repo }).onConflict('repo').ignore();
-    await knex('subscriptions').insert({
+    await this.repositoryModel.upsert(repo);
+    await this.db('subscriptions').insert({
       email,
       repo,
       confirm_token: confirmToken,
@@ -34,7 +58,7 @@ export class SubscriptionModel {
 
   // Returns true if a subscription for the given email and repo already exists.
   async existsByEmailAndRepo(email: string, repo: string): Promise<boolean> {
-    const row: unknown = await knex('subscriptions')
+    const row: unknown = await this.db('subscriptions')
       .where({ email, repo })
       .first();
     return row !== undefined;
@@ -44,7 +68,9 @@ export class SubscriptionModel {
   async confirm(
     confirmToken: string,
   ): Promise<{ email: string; repo: string } | null> {
-    const rows: { email: string; repo: string }[] = await knex('subscriptions')
+    const rows: { email: string; repo: string }[] = await this.db(
+      'subscriptions',
+    )
       .where({ confirm_token: confirmToken })
       .update({ status: 'confirmed' })
       .returning(['email', 'repo']);
@@ -55,7 +81,9 @@ export class SubscriptionModel {
   async deleteByUnsubscribeToken(
     unsubscribeToken: string,
   ): Promise<{ email: string; repo: string } | null> {
-    const rows: { email: string; repo: string }[] = await knex('subscriptions')
+    const rows: { email: string; repo: string }[] = await this.db(
+      'subscriptions',
+    )
       .where({ unsubscribe_token: unsubscribeToken })
       .delete()
       .returning(['email', 'repo']);
@@ -66,7 +94,7 @@ export class SubscriptionModel {
   async findAllConfirmedWithTokens(): Promise<
     ConfirmedSubscriptionWithToken[]
   > {
-    return knex('subscriptions')
+    return this.db('subscriptions')
       .join('repositories', 'subscriptions.repo', 'repositories.repo')
       .where('subscriptions.status', 'confirmed')
       .select(
@@ -77,14 +105,9 @@ export class SubscriptionModel {
       );
   }
 
-  // Updates last_seen_tag for the given repository.
-  async updateLastSeenTag(repo: string, tag: string): Promise<void> {
-    await knex('repositories').where({ repo }).update({ last_seen_tag: tag });
-  }
-
   // Returns all confirmed subscriptions for the given email, including last seen release tag.
   async findByEmail(email: string): Promise<Subscription[]> {
-    const rows: SubscriptionRow[] = await knex('subscriptions')
+    const rows: SubscriptionRow[] = await this.db('subscriptions')
       .join('repositories', 'subscriptions.repo', 'repositories.repo')
       .where({
         'subscriptions.email': email,
@@ -104,5 +127,3 @@ export class SubscriptionModel {
     }));
   }
 }
-
-export const subscriptionModel = new SubscriptionModel();
