@@ -18,12 +18,13 @@ reviews:
     ignore_title_keywords: []
     labels: []
     drafts: false
-    path_instructions: [
-      {
-        path: '**/*.ts',
-        instructions: 'Do not suggest validation. Do not suggest error handling. Do not suggest translations. Do not repeat same comments in one pull request.'
-      }
-    ]
+    path_instructions:
+      [
+        {
+          path: '**/*.ts',
+          instructions: 'Do not suggest validation. Do not suggest error handling. Do not suggest translations. Do not repeat same comments in one pull request.',
+        },
+      ]
     base_branches:
       - main
   chat:
