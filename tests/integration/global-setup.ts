@@ -11,7 +11,7 @@ const sleep = async (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export default async function globalSetup(): Promise<void> {
   // Must run before any src/ imports so DATABASE_URL is available.
-  // Fall back to .env.test.example so neither CI nor local dev needs to copy the file manually.
+  // Fails fast if .env.test is missing — copy .env.test.example to create it.
   const envLoaded = config({
     path: resolve(process.cwd(), '.env.test'),
     override: true,
