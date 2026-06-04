@@ -15,7 +15,11 @@ export interface IEmailTemplateBuilder {
 }
 
 export class EmailTemplateBuilder implements IEmailTemplateBuilder {
-  constructor(private readonly baseUrl: string) {}
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl.trim().replace(/\/$/, '');
+  }
+
+  private readonly baseUrl: string;
 
   confirmationEmail(
     email: string,
