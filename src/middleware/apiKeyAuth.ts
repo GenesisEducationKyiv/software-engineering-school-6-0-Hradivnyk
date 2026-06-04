@@ -9,12 +9,6 @@ export function apiKeyAuth(
   next: NextFunction,
 ): void {
   const apiKey = config.auth.apiKey;
-
-  if (!apiKey) {
-    next();
-    return;
-  }
-
   const provided = req.headers['x-api-key'];
 
   if (typeof provided !== 'string' || provided.length === 0) {
