@@ -1,0 +1,85 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: uk-UA
+tone_instructions: 'Be concise and to the point. Back up suggestions with reasoning.'
+early_access: true
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: false
+  review_status: false
+  commit_status: true
+  poem: false
+  collapse_walkthrough: true
+  sequence_diagrams: false
+  changed_files_summary: false
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    ignore_title_keywords: []
+    labels: []
+    drafts: false
+    path_instructions: [
+      {
+        path: '**/*.ts',
+        instructions: 'Do not suggest validation. Do not suggest error handling. Do not suggest translations. Do not repeat same comments in one pull request.'
+      }
+    ]
+    base_branches:
+      - main
+  chat:
+    auto_reply: true
+  knowledge_base:
+    opt_out: false
+    learnings:
+      scope: global
+    issues:
+      scope: local
+    pull_requests:
+      scope: local
+  tools:
+    shellcheck: # Shellcheck is a static analysis tool that finds bugs in your shell scripts.
+      enabled: true
+    ruff: # Ruff is a Python linter and code formatter.
+      enabled: false
+    markdownlint: # Markdownlint is a static analysis tool to enforce standards and consistency for Markdown files.
+      enabled: true
+    github-checks: # GitHub Checks integration configuration.
+      enabled: true
+    languagetool: # LanguageTool is a style and grammar checker for 30+ languages.
+      enabled: true
+    biome: # Biome is a fast formatter, linter, and analyzer for web projects.
+      enabled: false
+    hadolint: # Hadolint is a Dockerfile linter.
+      enabled: true
+    swiftlint: # SwiftLint integration configuration object.
+      enabled: false
+    phpstan: # PHPStan is a tool to analyze PHP code.
+      enabled: false
+    golangci-lint: # golangci-lint is a fast linters runner for Go.
+      enabled: false
+    yamllint: # yamllint is a linter for YAML files.
+      enabled: true
+    gitleaks: # Gitleaks is a secret scanner.
+      enabled: true
+    checkov: # Checkov is a static code analysis tool for infrastructure-as-code files.
+      enabled: true
+    detekt: # Detekt is a static code analysis tool for Kotlin files.
+      enabled: false
+    eslint: # ESLint is a static code analysis tool for JavaScript files.
+      enabled: false
+    rubocop: # RuboCop is a Ruby static code analyzer (a.k.a. linter ) and code formatter.
+      enabled: false
+    buf: # Buf offers linting for Protobuf files.
+      enabled: false
+    regal: # Regal is a linter and language server for Rego.
+      enabled: false
+    actionlint: # actionlint is a static checker for GitHub Actions workflow files.
+      enabled: true
+    pmd: # PMD is an extensible multilanguage static code analyzer. It’s mainly concerned with Java.
+      enabled: false
+    cppcheck: # Cppcheck is a static code analysis tool for the C and C++ programming languages
+      enabled: false
+    semgrep: # Semgrep is a static analysis tool designed to scan code for security vulnerabilities and code quality issues.
+      enabled: true
+    circleci: # CircleCi tool is a static checker for CircleCi config files.
+      enabled: false
