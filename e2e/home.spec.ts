@@ -1,34 +1,22 @@
 import { test, expect, type Page } from '@playwright/test';
+import { fillAndSubmit } from './helpers';
 
 const VALID_REPO = 'golang/go';
 const VALID_EMAIL = 'test@example.com';
 const VALID_API_KEY = 'test-api-key';
-
-async function fillAndSubmit(
-  page: Page,
-  fields: { repo?: string; email?: string; apiKey?: string },
-): Promise<void> {
-  if (fields.repo !== undefined)
-    await page.getByLabel('Repository (owner/repo)').fill(fields.repo);
-  if (fields.email !== undefined)
-    await page.getByLabel('Email').fill(fields.email);
-  if (fields.apiKey !== undefined)
-    await page.getByLabel('API Key').fill(fields.apiKey);
-  await page.getByRole('button', { name: 'Subscribe' }).click();
-}
 
 async function mockSubscribe(
   page: Page,
   status: number,
   body: Record<string, string>,
 ): Promise<void> {
-  await page.route('**/api/subscribe', async (route) =>
-    route.fulfill({
+  await page.route('**/api/subscribe', async (route) => {
+    await route.fulfill({
       status,
       contentType: 'application/json',
       body: JSON.stringify(body),
-    }),
-  );
+    });
+  });
 }
 
 test.describe('home page', () => {
@@ -149,7 +137,9 @@ test.describe('home page', () => {
     });
 
     test('shows fallback message on network failure', async ({ page }) => {
-      await page.route('**/api/subscribe', async (route) => route.abort());
+      await page.route('**/api/subscribe', async (route) => {
+        await route.abort();
+      });
 
       await fillAndSubmit(page, {
         repo: VALID_REPO,
