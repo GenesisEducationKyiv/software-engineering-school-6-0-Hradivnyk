@@ -56,6 +56,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     restart: no
 
 # Use a tmpfs-backed volume so E2E tests always get a fresh database.

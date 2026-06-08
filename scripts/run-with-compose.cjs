@@ -55,6 +55,12 @@ for (let i = 0; i < rawComposeArgs.length; i++) {
 
 const composeFlags = composeFlagParts.join(' ');
 const testCommand = args.slice(separatorIndex + 1).join(' ');
+
+if (!testCommand.trim()) {
+  console.error('Error: no test command provided after --');
+  process.exit(1);
+}
+
 const compose = `docker compose ${composeFlags}`;
 
 function run(cmd) {
