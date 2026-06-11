@@ -117,7 +117,6 @@ jobs:
         run: npm run test:e2e:ci
         env:
           PLAYWRIGHT_SKIP_WEBSERVER: 1
-          PLAYWRIGHT_BASE_URL: http://localhost:3000
 
   deploy:
     name: Deploy to EC2
