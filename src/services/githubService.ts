@@ -1,7 +1,9 @@
 import { GitHubRateLimitError } from '../errors.js';
 import type { IHttpClient } from '../httpClient.js';
 
-const GITHUB_API = 'https://api.github.com';
+// GITHUB_API_URL can be overridden in tests to point to a local mock server
+// instead of the real GitHub API, avoiding external network calls in E2E.
+const GITHUB_API = process.env.GITHUB_API_URL ?? 'https://api.github.com';
 
 export interface Release {
   tag_name: string;

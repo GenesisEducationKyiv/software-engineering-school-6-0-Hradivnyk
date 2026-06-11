@@ -8,6 +8,7 @@
   "include": [
     "src/**/*",
     "tests/**/*",
+    "e2e/**/*",
     "jest.config.cjs",
     "*.config.ts",
     "knexfile.ts"

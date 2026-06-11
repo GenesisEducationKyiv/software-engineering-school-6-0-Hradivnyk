@@ -41,11 +41,26 @@ app.use(pinoHttp({ logger }));
 
 app.use(express.json());
 
-// Swagger
+// Swagger UI needs 'unsafe-inline' for its own scripts and styles.
+// Rather than removing CSP entirely, we apply a scoped helmet policy that
+// relaxes only the directives Swagger UI requires while keeping all others.
 const swaggerDocument = load(
   readFileSync(resolve(process.cwd(), 'swagger.yaml'), 'utf8'),
 ) as JsonObject;
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.use(
+  '/api/docs',
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'"],
+    },
+  }),
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerDocument),
+);
 
 app.use(express.urlencoded({ extended: false }));
 

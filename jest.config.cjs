@@ -12,7 +12,6 @@ const baseConfig = {
 
 module.exports = {
   ...baseConfig,
-  testMatch: ['**/__tests__/**/*.test.ts', '**/tests/integration/**/*.test.ts'],
   projects: [
     {
       ...baseConfig,
@@ -23,6 +22,9 @@ module.exports = {
       ...baseConfig,
       displayName: 'integration',
       testMatch: ['<rootDir>/tests/integration/**/*.test.ts'],
+      globalSetup: '<rootDir>/tests/integration/global-setup.ts',
+      // overrides baseConfig.setupFiles — loads .env.test before any imports
+      setupFiles: ['<rootDir>/tests/integration/env-setup.ts'],
     },
   ],
 };

@@ -8,7 +8,7 @@ import globals from 'globals';
 
 export default tseslint.config(
   // only linting our own code, not what the build tools have generated.
-  { ignores: ['dist/**', 'coverage/**'] },
+  { ignores: ['dist/**', 'coverage/**', '.claude/**'] },
 
   js.configs.recommended,
 
@@ -66,7 +66,7 @@ export default tseslint.config(
   },
 
   {
-    files: ['.husky/**/*.mjs'],
+    files: ['.husky/**/*.mjs', 'scripts/**/*.cjs', '**/*.cjs'],
     languageOptions: {
       globals: { ...globals.node },
     },
@@ -87,6 +87,24 @@ export default tseslint.config(
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+    },
+  },
+
+  {
+    files: ['e2e/**/*.ts', 'playwright.config.ts'],
+    rules: {
+      'no-console': 'off',
+      'no-await-in-loop': 'off',
+      'n/no-missing-import': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      // Playwright types are resolved at runtime via its own module; these
+      // rules produce false positives because typescript-eslint cannot fully
+      // resolve the Playwright type graph through tsconfig.eslint.json.
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
     },
   },
 
