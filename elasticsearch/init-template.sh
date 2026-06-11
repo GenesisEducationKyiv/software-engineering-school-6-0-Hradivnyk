@@ -7,6 +7,13 @@ TEMPLATE_NAME="app-logs"
 TEMPLATE_FILE="/etc/elasticsearch/index-template.json"
 SAVED_OBJECTS_FILE="/etc/kibana/saved_objects.ndjson"
 
+echo "Waiting for Elasticsearch to be available..."
+until curl -sf "${ES_URL}/_cluster/health" | grep -qE '"status":"(green|yellow)"'; do
+  echo "  Elasticsearch not ready, retrying in 5s..."
+  sleep 5
+done
+echo "Elasticsearch is available."
+
 echo "Applying Elasticsearch index template '${TEMPLATE_NAME}'..."
 
 curl -sf -X PUT "${ES_URL}/_index_template/${TEMPLATE_NAME}" \

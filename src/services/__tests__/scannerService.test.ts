@@ -56,6 +56,7 @@ describe('ScannerService', () => {
     };
     mockLogger = {
       info: jest.fn(),
+      warn: jest.fn(),
       debug: jest.fn(),
       error: jest.fn(),
     };

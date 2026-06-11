@@ -10,8 +10,6 @@ services:
         condition: service_healthy # wait for DB to be ready
     labels:
       co.elastic.logs/enabled: 'true'
-      co.elastic.logs/json.keys_under_root: 'true'
-      co.elastic.logs/json.overwrite_keys: 'true'
     restart: unless-stopped
 
   caddy:
@@ -110,12 +108,13 @@ services:
     command: filebeat -e --strict.perms=false
     volumes:
       - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-      - ./filebeat/fields.yml:/usr/share/filebeat/fields.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       elasticsearch:
         condition: service_healthy
+      es-init:
+        condition: service_completed_successfully # apply index template before shipping logs
     restart: unless-stopped
 
   grafana:
