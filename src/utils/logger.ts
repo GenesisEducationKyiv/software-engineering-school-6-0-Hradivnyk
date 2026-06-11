@@ -1,4 +1,5 @@
-import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import path from 'node:path';
 import pino from 'pino';
 import { config } from '../config/index.js';
 import { requestContext } from './requestContext.js';
@@ -10,11 +11,9 @@ export interface ILogger {
   error(objOrMsg: object | string, msg?: string): void;
 }
 
-const _require = createRequire(import.meta.url);
-const { name, version } = _require('../../package.json') as {
-  name: string;
-  version: string;
-};
+const { name, version } = JSON.parse(
+  fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf-8'),
+) as { name: string; version: string };
 
 const baseLogger = pino({
   level: config.server.logLevel,

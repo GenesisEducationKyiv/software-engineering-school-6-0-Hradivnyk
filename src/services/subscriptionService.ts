@@ -14,6 +14,9 @@ import type { IGithubService } from './githubService.js';
 import { isValidToken } from '../utils/token.js';
 import type { ISubscriptionService } from '../interfaces/ISubscriptionService.js';
 
+const hashEmail = (email: string): string =>
+  crypto.createHash('sha256').update(email).digest('hex').slice(0, 12);
+
 export class SubscriptionService implements ISubscriptionService {
   constructor(
     private readonly subscriptionModel: ISubscriptionModel,
@@ -37,7 +40,7 @@ export class SubscriptionService implements ISubscriptionService {
     );
     if (alreadySubscribed) {
       logger.warn(
-        { event: 'subscription.duplicate', email, repo },
+        { event: 'subscription.duplicate', emailHash: hashEmail(email), repo },
         'Duplicate subscription attempt',
       );
       subscriptionOperationsTotal.inc({
@@ -62,7 +65,7 @@ export class SubscriptionService implements ISubscriptionService {
       result: 'success',
     });
     logger.info(
-      { event: 'subscription.created', email, repo },
+      { event: 'subscription.created', emailHash: hashEmail(email), repo },
       'Subscription created',
     );
   }
@@ -88,7 +91,11 @@ export class SubscriptionService implements ISubscriptionService {
       result: 'success',
     });
     logger.info(
-      { event: 'subscription.confirmed', email: sub.email, repo: sub.repo },
+      {
+        event: 'subscription.confirmed',
+        emailHash: hashEmail(sub.email),
+        repo: sub.repo,
+      },
       'Subscription confirmed',
     );
   }
@@ -114,7 +121,11 @@ export class SubscriptionService implements ISubscriptionService {
       result: 'success',
     });
     logger.info(
-      { event: 'subscription.unsubscribed', email: sub.email, repo: sub.repo },
+      {
+        event: 'subscription.unsubscribed',
+        emailHash: hashEmail(sub.email),
+        repo: sub.repo,
+      },
       'Subscription unsubscribed',
     );
   }
