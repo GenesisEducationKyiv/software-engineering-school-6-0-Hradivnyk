@@ -36,7 +36,12 @@ describe('ScannerService', () => {
     mockSubs = { findAllConfirmedWithTokens: jest.fn() };
     mockGithub = { repositoryExists: jest.fn(), getLatestRelease: jest.fn() };
     mockReleaseHandler = { handle: jest.fn().mockResolvedValue(undefined) };
-    mockLogger = { info: jest.fn(), debug: jest.fn(), error: jest.fn() };
+    mockLogger = {
+      info: jest.fn(),
+      warn: jest.fn(),
+      debug: jest.fn(),
+      error: jest.fn(),
+    };
 
     service = new ScannerService(
       mockSubs,

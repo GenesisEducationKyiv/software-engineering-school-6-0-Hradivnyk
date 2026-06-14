@@ -1,66 +1,68 @@
 import request from 'supertest';
 import app from '../../src/app.js';
-import type {
-  ISubscriptionService,
-  Subscription,
-} from '../../src/modules/subscriptions/subscription.types.js';
-import {
-  DuplicateSubscriptionError,
-  RepositoryNotFoundError,
-  TokenNotFoundError,
-} from '../../src/modules/subscriptions/subscription.errors.js';
+import knex from '../../src/platform/db/knex.js';
+import { GithubService } from '../../src/modules/github/github.service.js';
+import { EmailService } from '../../src/modules/notifications/email.service.js';
+import { subscriptionModel, repositoryModel } from '../../src/container.js';
 
-jest.mock('../../src/platform/db/knex.js', () => ({}));
+jest.mock('../../src/modules/github/github.service.js');
+jest.mock('../../src/modules/notifications/email.service.js');
 
-// Provide a real SubscriptionController wired to a mock service so that
-// the full HTTP layer (validation, error handling) is exercised as-is.
-jest.mock('../../src/container.js', () => {
-  // Typed destructuring (not an `as` assertion) — survives eslint --fix
-  // no-unsafe-assignment is off for test files, so assigning `any` to a typed
-  // variable is allowed.
-  const {
-    SubscriptionController,
-  }: typeof import('../../src/modules/subscriptions/subscription.controller.js') =
-    jest.requireActual(
-      '../../src/modules/subscriptions/subscription.controller.js',
+const mockedGithub = jest.mocked(GithubService).prototype;
+const mockedEmail = jest.mocked(EmailService).prototype;
+
+const EMAIL = 'integration@example.com';
+const REPO = 'owner/repo';
+const API_KEY =
+  process.env.API_KEY ??
+  (() => {
+    throw new Error(
+      'API_KEY environment variable is required for integration tests',
     );
+  })();
 
-  const service: { [K in keyof ISubscriptionService]: jest.Mock } = {
-    subscribe: jest.fn(),
-    confirm: jest.fn(),
-    unsubscribe: jest.fn(),
-    getSubscriptions: jest.fn(),
-  };
+async function subscribe(email = EMAIL, repo = REPO) {
+  return request(app)
+    .post('/api/subscribe')
+    .set('X-API-Key', API_KEY)
+    .send({ email, repo });
+}
 
+async function getTokens(email = EMAIL, repo = REPO) {
+  const row = await knex('subscriptions')
+    .where({ email, repo })
+    .select('confirm_token', 'unsubscribe_token')
+    .first();
+  expect(row).toBeDefined();
   return {
-    subscriptionController: new SubscriptionController(service),
-    scannerService: { scan: jest.fn() },
-    _mockService: service,
+    confirmToken: row.confirm_token as string,
+    unsubscribeToken: row.unsubscribe_token as string,
   };
+}
+
+beforeEach(async () => {
+  await knex('subscriptions').delete();
+  await knex('repositories').delete();
+  jest.clearAllMocks();
+  mockedGithub.repositoryExists.mockResolvedValue(true);
+  mockedEmail.sendConfirmationEmail.mockResolvedValue(undefined);
 });
 
-type MockService = { [K in keyof ISubscriptionService]: jest.Mock };
+afterAll(async () => {
+  await knex.destroy();
+});
 
-// Typed declaration (not `as` assertion) — no-unsafe-assignment/member-access
-// are off in test files, so reading `any._mockService` into MockService is fine.
-const mockedService: MockService = jest.requireMock(
-  '../../src/container.js',
-)._mockService;
-
-const VALID_TOKEN = 'a'.repeat(64);
-const EMAIL = 'user@example.com';
-const REPO = 'owner/repo';
-const API_KEY = process.env.API_KEY as string;
+// ---------------------------------------------------------------------------
 
 describe('API key authentication', () => {
-  it('should return 401 when X-API-Key header is missing', async () => {
+  it('returns 401 when X-API-Key header is missing', async () => {
     const res = await request(app).post('/api/subscribe').send({});
 
     expect(res.status).toBe(401);
     expect(res.body).toHaveProperty('error');
   });
 
-  it('should return 401 when X-API-Key header is invalid', async () => {
+  it('returns 401 when X-API-Key header is invalid', async () => {
     const res = await request(app)
       .post('/api/subscribe')
       .set('X-API-Key', 'wrong-key')
@@ -71,204 +73,245 @@ describe('API key authentication', () => {
   });
 });
 
-describe('POST /api/subscribe', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockedService.subscribe.mockResolvedValue(undefined);
-  });
+// ---------------------------------------------------------------------------
 
-  it('should return 200 and send a confirmation email with valid email and existing repository', async () => {
-    const res = await request(app)
-      .post('/api/subscribe')
-      .set('X-API-Key', API_KEY)
-      .send({ email: EMAIL, repo: REPO });
+describe('POST /api/subscribe', () => {
+  it('returns 200 and persists a pending subscription', async () => {
+    const res = await subscribe();
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('message');
-    expect(mockedService.subscribe).toHaveBeenCalledWith(EMAIL, REPO);
-  });
 
-  it('should return 400 if email format is invalid', async () => {
-    const res = await request(app)
-      .post('/api/subscribe')
-      .set('X-API-Key', API_KEY)
-      .send({ email: 'invalid-email', repo: REPO });
-
-    expect(res.status).toBe(400);
-    expect(res.body).toHaveProperty('error');
-  });
-
-  it('should return 400 if repo does not match owner/repo format', async () => {
-    const res = await request(app)
-      .post('/api/subscribe')
-      .set('X-API-Key', API_KEY)
-      .send({ email: EMAIL, repo: 'invalid' });
-
-    expect(res.status).toBe(400);
-    expect(res.body).toHaveProperty('error');
-  });
-
-  it('should return 404 if repository is not found on GitHub', async () => {
-    mockedService.subscribe.mockRejectedValue(
-      new RepositoryNotFoundError(REPO),
+    const sub = await knex('subscriptions')
+      .where({ email: EMAIL, repo: REPO })
+      .first();
+    expect(sub).toMatchObject({ email: EMAIL, repo: REPO, status: 'pending' });
+    expect(mockedEmail.sendConfirmationEmail).toHaveBeenCalledWith(
+      EMAIL,
+      expect.stringMatching(/^[0-9a-f]{64}$/),
+      REPO,
     );
+  });
 
-    const res = await request(app)
-      .post('/api/subscribe')
-      .set('X-API-Key', API_KEY)
-      .send({ email: EMAIL, repo: REPO });
+  it('does not fail when the same repo is used for a different email', async () => {
+    await subscribe(EMAIL, REPO);
+
+    const res = await subscribe('other@example.com', REPO);
+
+    expect(res.status).toBe(200);
+    const count = await knex('repositories')
+      .where({ repo: REPO })
+      .count('* as n')
+      .first();
+    expect(Number(count?.n)).toBe(1); // upsert — still one repo row
+  });
+
+  it('returns 400 for invalid email format', async () => {
+    const res = await subscribe('not-an-email', REPO);
+
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('error');
+  });
+
+  it('returns 400 for invalid repo format', async () => {
+    const res = await subscribe(EMAIL, 'no-slash');
+
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('error');
+  });
+
+  it('returns 404 when repository does not exist on GitHub', async () => {
+    mockedGithub.repositoryExists.mockResolvedValue(false);
+
+    const res = await subscribe();
 
     expect(res.status).toBe(404);
     expect(res.body).toHaveProperty('error');
   });
 
-  it('should return 409 if email is already subscribed to this repository', async () => {
-    mockedService.subscribe.mockRejectedValue(
-      new DuplicateSubscriptionError(EMAIL, REPO),
-    );
-
-    const res = await request(app)
-      .post('/api/subscribe')
-      .set('X-API-Key', API_KEY)
-      .send({ email: EMAIL, repo: REPO });
+  it('returns 409 and keeps only one subscription on duplicate', async () => {
+    await subscribe();
+    const res = await subscribe();
 
     expect(res.status).toBe(409);
     expect(res.body).toHaveProperty('error');
+
+    const count = await knex('subscriptions')
+      .where({ email: EMAIL, repo: REPO })
+      .count('* as n')
+      .first();
+    expect(Number(count?.n)).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
 
 describe('GET /api/confirm/:token', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+  beforeEach(async () => {
+    await subscribe();
   });
 
-  it('should return 200 and confirm the subscription with a valid token', async () => {
-    mockedService.confirm.mockResolvedValue(undefined);
+  it('returns 200 and marks subscription as confirmed in DB', async () => {
+    const { confirmToken } = await getTokens();
 
-    const res = await request(app)
-      .get(`/api/confirm/${VALID_TOKEN}`)
-      .set('X-API-Key', API_KEY);
+    const res = await request(app).get(`/api/confirm/${confirmToken}`);
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('message');
-    expect(mockedService.confirm).toHaveBeenCalledWith(VALID_TOKEN);
+
+    const sub = await knex('subscriptions')
+      .where({ confirm_token: confirmToken })
+      .first();
+    expect(sub.status).toBe('confirmed');
   });
 
-  it('should return 400 if token format is invalid', async () => {
-    const res = await request(app)
-      .get('/api/confirm/invalid-token')
-      .set('X-API-Key', API_KEY);
+  it('returns 400 for invalid token format', async () => {
+    const res = await request(app).get('/api/confirm/invalid-token');
 
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty('error');
   });
 
-  it('should return 404 if token is not found', async () => {
-    mockedService.confirm.mockRejectedValue(new TokenNotFoundError());
-
-    const res = await request(app)
-      .get(`/api/confirm/${VALID_TOKEN}`)
-      .set('X-API-Key', API_KEY);
+  it('returns 404 for unknown token', async () => {
+    const res = await request(app).get(`/api/confirm/${'a'.repeat(64)}`);
 
     expect(res.status).toBe(404);
     expect(res.body).toHaveProperty('error');
   });
 });
+
+// ---------------------------------------------------------------------------
 
 describe('GET /api/unsubscribe/:token', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+  beforeEach(async () => {
+    await subscribe();
   });
 
-  it('should return 200 and remove the subscription with a valid token', async () => {
-    mockedService.unsubscribe.mockResolvedValue(undefined);
+  it('returns 200 and removes the subscription from DB', async () => {
+    const { unsubscribeToken } = await getTokens();
 
-    const res = await request(app)
-      .get(`/api/unsubscribe/${VALID_TOKEN}`)
-      .set('X-API-Key', API_KEY);
+    const res = await request(app).get(`/api/unsubscribe/${unsubscribeToken}`);
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('message');
-    expect(mockedService.unsubscribe).toHaveBeenCalledWith(VALID_TOKEN);
+
+    const sub = await knex('subscriptions')
+      .where({ unsubscribe_token: unsubscribeToken })
+      .first();
+    expect(sub).toBeUndefined();
   });
 
-  it('should return 400 if token format is invalid', async () => {
-    const res = await request(app)
-      .get('/api/unsubscribe/bad-token')
-      .set('X-API-Key', API_KEY);
+  it('returns 400 for invalid token format', async () => {
+    const res = await request(app).get('/api/unsubscribe/bad-token');
 
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty('error');
   });
 
-  it('should return 404 if token is not found', async () => {
-    mockedService.unsubscribe.mockRejectedValue(new TokenNotFoundError());
-
-    const res = await request(app)
-      .get(`/api/unsubscribe/${VALID_TOKEN}`)
-      .set('X-API-Key', API_KEY);
+  it('returns 404 for unknown token', async () => {
+    const res = await request(app).get(`/api/unsubscribe/${'b'.repeat(64)}`);
 
     expect(res.status).toBe(404);
     expect(res.body).toHaveProperty('error');
   });
 });
 
+// ---------------------------------------------------------------------------
+
 describe('GET /api/subscriptions', () => {
-  const subscriptions: Subscription[] = [
-    { email: EMAIL, repo: REPO, confirmed: true, last_seen_tag: 'v1.0.0' },
-    {
-      email: EMAIL,
-      repo: 'owner/other-repo',
-      confirmed: true,
-      last_seen_tag: null,
-    },
-  ];
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('should return 200 and an array of subscriptions for a given email', async () => {
-    mockedService.getSubscriptions.mockResolvedValue(subscriptions);
+  it('returns confirmed subscriptions for the given email', async () => {
+    await subscribe();
+    const { confirmToken } = await getTokens();
+    await request(app).get(`/api/confirm/${confirmToken}`);
 
     const res = await request(app)
       .get('/api/subscriptions')
-      .set('X-API-Key', API_KEY)
       .query({ email: EMAIL });
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual(subscriptions);
-    expect(mockedService.getSubscriptions).toHaveBeenCalledWith(EMAIL);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0]).toMatchObject({
+      email: EMAIL,
+      repo: REPO,
+      confirmed: true,
+    });
   });
 
-  it('should return 200 and an empty array if no subscriptions exist', async () => {
-    mockedService.getSubscriptions.mockResolvedValue([]);
+  it('returns empty array when subscription is still pending', async () => {
+    await subscribe(); // pending — not yet confirmed
 
     const res = await request(app)
       .get('/api/subscriptions')
-      .set('X-API-Key', API_KEY)
       .query({ email: EMAIL });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(0);
+  });
+
+  it('returns empty array for unknown email', async () => {
+    const res = await request(app)
+      .get('/api/subscriptions')
+      .query({ email: 'nobody@example.com' });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual([]);
   });
 
-  it('should return 400 if email query parameter is missing', async () => {
-    const res = await request(app)
-      .get('/api/subscriptions')
-      .set('X-API-Key', API_KEY);
+  it('returns 400 when email query param is missing', async () => {
+    const res = await request(app).get('/api/subscriptions');
 
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty('error');
   });
 
-  it('should return 400 if email format is invalid', async () => {
+  it('returns 400 for invalid email format', async () => {
     const res = await request(app)
       .get('/api/subscriptions')
-      .set('X-API-Key', API_KEY)
-      .query({ email: 'not-a-valid-email' });
+      .query({ email: 'not-valid' });
 
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty('error');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Scanner methods — not exposed via HTTP, tested directly against the DB
+
+describe('subscriptionModel - scanner methods', () => {
+  describe('findAllConfirmedWithTokens()', () => {
+    it('returns confirmed subscriptions with unsubscribe token', async () => {
+      await subscribe();
+      const { confirmToken, unsubscribeToken } = await getTokens();
+      await request(app).get(`/api/confirm/${confirmToken}`);
+
+      const result = await subscriptionModel.findAllConfirmedWithTokens();
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        email: EMAIL,
+        repo: REPO,
+        unsubscribe_token: unsubscribeToken,
+        last_seen_tag: null,
+      });
+    });
+
+    it('does not return pending subscriptions', async () => {
+      await subscribe();
+
+      const result = await subscriptionModel.findAllConfirmedWithTokens();
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('updateLastSeenTag()', () => {
+    it('updates last_seen_tag for the repository', async () => {
+      await subscribe();
+
+      await repositoryModel.updateLastSeenTag(REPO, 'v3.0.0');
+
+      const repo = await knex('repositories').where({ repo: REPO }).first();
+      expect(repo.last_seen_tag).toBe('v3.0.0');
+    });
   });
 });

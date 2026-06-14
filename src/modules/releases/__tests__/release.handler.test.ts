@@ -40,7 +40,12 @@ describe('InProcessReleaseHandler', () => {
       upsert: jest.fn(),
       updateLastSeenTag: jest.fn().mockResolvedValue(undefined),
     };
-    mockLogger = { info: jest.fn(), debug: jest.fn(), error: jest.fn() };
+    mockLogger = {
+      info: jest.fn(),
+      warn: jest.fn(),
+      debug: jest.fn(),
+      error: jest.fn(),
+    };
 
     handler = new InProcessReleaseHandler(
       mockNotifier,

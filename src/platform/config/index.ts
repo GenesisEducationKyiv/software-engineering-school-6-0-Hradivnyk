@@ -17,6 +17,14 @@ export const config = {
     isDev: nodeEnv === 'development',
     isProd: nodeEnv === 'production',
     isTest: nodeEnv === 'test',
+    logLevel: optional(
+      'LOG_LEVEL',
+      nodeEnv === 'test'
+        ? 'silent'
+        : nodeEnv === 'development'
+          ? 'debug'
+          : 'info',
+    ),
   },
   db: {
     url: required('DATABASE_URL'),

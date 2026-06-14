@@ -40,6 +40,8 @@ const subscriptionService = new SubscriptionService(
   githubService,
 );
 
+export { subscriptionModel, repositoryModel };
+
 export const subscriptionController = new SubscriptionController(
   subscriptionService,
 );

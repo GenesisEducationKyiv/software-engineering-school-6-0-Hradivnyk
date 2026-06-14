@@ -138,13 +138,26 @@ flowchart TB
         Caddy["Caddy (TLS)\n:80 / :443"]
         App["Node.js App"]
         PG[("PostgreSQL 16")]
+        Filebeat["Filebeat"]
+        ES[("Elasticsearch")]
+        Kibana["Kibana\n(/kibana)"]
+        ESInit["es-init\n(one-shot)"]
         Caddy <-->|":3000"| App
+        Caddy <-->|":5601"| Kibana
+        Caddy <-->|":3000/grafana"| Grafana["Grafana\n(/grafana)"]
         App --> PG
+        Filebeat -->|"JSON logs"| ES
+        Kibana --> ES
+        ESInit -->|"PUT /_index_template"| ES
+        Prometheus["Prometheus"] -->|"scrape /metrics"| App
+        Grafana --> Prometheus
     end
     GitHub["GitHub REST API"]
     SMTP["SMTP Server"]
+    Docker["Docker log files"]
     App --> GitHub
     App --> SMTP
+    Docker -->|"container logs"| Filebeat
 ```
 
 ### Subscription Flow (Happy Path)
@@ -452,7 +465,7 @@ Nodemailer over standard SMTP. Compatible with any SMTP provider:
 
 ### 9.1 Logging (current)
 
-Structured JSON logging is implemented via **Pino** with `pino-http` for HTTP request logging.
+Structured JSON logging is implemented via **Pino** with `pino-http` for HTTP request logging. Logs are aggregated via the **ELK stack** (see [ADR-003](adr/ADR-003-elk-stack-logging.md)).
 
 | Level   | When used                                                               |
 | ------- | ----------------------------------------------------------------------- |
@@ -462,21 +475,41 @@ Structured JSON logging is implemented via **Pino** with `pino-http` for HTTP re
 
 Every HTTP request is logged with method, URL, status code, and response time. The scanner logs each cycle: repositories checked, new releases found, emails sent.
 
-### 9.2 Metrics (planned)
+**Log pipeline:**
 
-> Not yet implemented. Planned for a future course milestone.
+```
+Node.js (Pino JSON) → Docker log driver → Filebeat → Elasticsearch → Kibana
+```
 
-| Metric                             | Type      | Description                                  |
-| ---------------------------------- | --------- | -------------------------------------------- |
-| `http_requests_total`              | Counter   | Total HTTP requests by method, route, status |
-| `http_request_duration_ms`         | Histogram | P50/P95/P99 response times                   |
-| `scanner_cycle_duration_ms`        | Histogram | Duration of each full scan cycle             |
-| `scanner_repos_checked_total`      | Counter   | Repositories checked per cycle               |
-| `scanner_notifications_sent_total` | Counter   | Notification emails sent per cycle           |
-| `github_api_errors_total`          | Counter   | GitHub API failures by error type            |
-| `smtp_errors_total`                | Counter   | SMTP delivery failures                       |
+Filebeat reads container logs via the Docker socket and uses the `co.elastic.logs/*` labels on the `app` container to parse output as JSON. In production, Kibana is available at `https://<DOMAIN>/kibana` behind Caddy `basic_auth`.
 
-**Planned stack:** Prometheus exposition format via `prom-client`, scraped by a Prometheus instance, visualised in Grafana.
+**Index template (`es-init`):**
+
+An `es-init` one-shot container (`curlimages/curl`) runs on every `docker compose up`, after Elasticsearch passes its health check. It applies the composable index template from `elasticsearch/index-template.json` via `PUT /_index_template/app-logs`. A `dynamic_template` maps any unmapped string field to `keyword` by default, preventing Elasticsearch from auto-guessing `text` for new fields.
+
+### 9.2 Metrics (current)
+
+Metrics are exposed at `GET /metrics` in Prometheus exposition format via **prom-client**. The endpoint is blocked externally by Caddy (`respond 404`) — only Prometheus scrapes it internally over the Docker network every 15 s.
+
+**Metric pipeline:**
+
+```
+Node.js (prom-client) → GET /metrics → Prometheus (scrape) → Grafana (visualise)
+```
+
+**Grafana** is available at `https://<DOMAIN>/grafana` behind Caddy `basic_auth`. On startup it auto-provisions Prometheus as the default datasource and loads the pre-built dashboard from `grafana/dashboards/github-scanner.json`.
+
+| Metric                            | Type      | Labels                     | Description                              |
+| --------------------------------- | --------- | -------------------------- | ---------------------------------------- |
+| `http_requests_total`             | Counter   | method, route, status_code | Total HTTP requests                      |
+| `http_request_duration_seconds`   | Histogram | method, route, status_code | Request latency — P50/P95/P99            |
+| `github_api_requests_total`       | Counter   | operation, result          | GitHub API calls by operation and result |
+| `subscription_operations_total`   | Counter   | operation, result          | Subscribe/confirm/unsubscribe outcomes   |
+| `scanner_releases_detected_total` | Counter   | repo                       | New releases found per repository        |
+| `scanner_emails_sent_total`       | Counter   | repo                       | Notification emails sent per repository  |
+| `scanner_scan_duration_seconds`   | Histogram | result                     | Full scanner cycle duration              |
+
+Default Node.js runtime metrics (CPU, heap, RSS, event-loop lag) are also collected via `collectDefaultMetrics()`.
 
 ### 9.3 Alerting (planned)
 
@@ -548,3 +581,4 @@ The `deploy` job runs **only on a push to `main`** (i.e. after a PR is merged) a
 Architectural decisions deferred until the project scales beyond a single EC2 instance are tracked as ADRs:
 
 - [ADR-002: Scanner Deduplication Under Horizontal Scaling](adr/ADR-002-scanner-horizontal-scaling.md)
+- [ADR-003: ELK Stack for Log Aggregation](adr/ADR-003-elk-stack-logging.md)

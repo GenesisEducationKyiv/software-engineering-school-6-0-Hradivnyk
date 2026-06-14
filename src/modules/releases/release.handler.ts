@@ -5,6 +5,10 @@ import type {
 } from '../subscriptions/index.js';
 import type { Release } from '../github/index.js';
 import type { ILogger } from '../../platform/logger.js';
+import {
+  scannerEmailsSentTotal,
+  scannerReleasesDetectedTotal,
+} from '../../metrics/index.js';
 
 /** Reacts to a newly detected release. The in-process implementation notifies
  *  subscribers and records the tag; in a later phase this seam is replaced by
@@ -29,14 +33,20 @@ export class InProcessReleaseHandler implements ReleaseHandler {
     release: Release,
     subscribers: ConfirmedSubscriptionWithToken[],
   ): Promise<void> {
+    scannerReleasesDetectedTotal.inc({ repo });
+
     const results = await Promise.allSettled(
       subscribers.map(async (sub) =>
-        this.notifier.sendNotificationEmail(
-          sub.email,
-          repo,
-          release.tag_name,
-          sub.unsubscribe_token,
-        ),
+        this.notifier
+          .sendNotificationEmail(
+            sub.email,
+            repo,
+            release.tag_name,
+            sub.unsubscribe_token,
+          )
+          .then(() => {
+            scannerEmailsSentTotal.inc({ repo });
+          }),
       ),
     );
 
