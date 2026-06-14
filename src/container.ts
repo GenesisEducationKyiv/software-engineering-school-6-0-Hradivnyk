@@ -1,19 +1,26 @@
-import knex from './db/knex.js';
-import { RepositoryModel } from './models/repositoryModel.js';
-import { SubscriptionModel } from './models/subscriptionModel.js';
-import { EmailService } from './services/emailService.js';
-import { NodemailerEmailSender } from './services/emailSender.js';
-import { EmailTemplateBuilder } from './services/emailTemplateBuilder.js';
-import { GithubService } from './services/githubService.js';
-import { FetchHttpClient } from './httpClient.js';
-import { SubscriptionService } from './services/subscriptionService.js';
-import { ScannerService } from './services/scannerService.js';
-import { SubscriptionController } from './controllers/subscriptionController.js';
-import { config } from './config/index.js';
-import logger from './utils/logger.js';
+import knex from './platform/db/knex.js';
+import { config } from './platform/config/index.js';
+import logger from './platform/logger.js';
+import { GithubService, FetchHttpClient } from './modules/github/index.js';
+import {
+  EmailService,
+  NodemailerEmailSender,
+  EmailTemplateBuilder,
+} from './modules/notifications/index.js';
+import { SubscriptionModel } from './modules/subscriptions/subscription.model.js';
+import { RepositoryModel } from './modules/subscriptions/repository.model.js';
+import { SubscriptionService } from './modules/subscriptions/subscription.service.js';
+import { SubscriptionController } from './modules/subscriptions/subscription.controller.js';
+import {
+  ScannerService,
+  InProcessReleaseHandler,
+} from './modules/releases/index.js';
 
-const repositoryModel = new RepositoryModel(knex);
-const subscriptionModel = new SubscriptionModel(knex, repositoryModel);
+const githubService = new GithubService(
+  new FetchHttpClient(),
+  config.github.token,
+);
+
 const emailSender = new NodemailerEmailSender({
   host: config.email.host,
   port: config.email.port,
@@ -22,26 +29,30 @@ const emailSender = new NodemailerEmailSender({
   from: config.email.from,
 });
 const emailTemplates = new EmailTemplateBuilder(config.app.baseUrl);
-const emailService = new EmailService(emailSender, emailTemplates);
-const githubService = new GithubService(
-  new FetchHttpClient(),
-  config.github.token,
-);
+const notifier = new EmailService(emailSender, emailTemplates);
+
+const repositoryModel = new RepositoryModel(knex);
+const subscriptionModel = new SubscriptionModel(knex, repositoryModel);
 
 const subscriptionService = new SubscriptionService(
   subscriptionModel,
-  emailService,
+  notifier,
   githubService,
-);
-
-export const scannerService = new ScannerService(
-  subscriptionModel,
-  repositoryModel,
-  emailService,
-  githubService,
-  logger,
 );
 
 export const subscriptionController = new SubscriptionController(
   subscriptionService,
+);
+
+const releaseHandler = new InProcessReleaseHandler(
+  notifier,
+  repositoryModel,
+  logger,
+);
+
+export const scannerService = new ScannerService(
+  subscriptionModel,
+  githubService,
+  releaseHandler,
+  logger,
 );

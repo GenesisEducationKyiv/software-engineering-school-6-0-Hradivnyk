@@ -8,11 +8,11 @@ import type { JsonObject } from 'swagger-ui-express';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import logger from './utils/logger.js';
+import logger from './platform/logger.js';
 import { pinoHttp } from 'pino-http';
-import { config } from './config/index.js';
-import subscriptionRoutes from './routes/subscriptionRoutes.js';
-import { errorHandler } from './middleware/errorHandler.js';
+import { config } from './platform/config/index.js';
+import { subscriptionRoutes } from './modules/subscriptions/index.js';
+import { errorHandler } from './platform/http/error-handler.js';
 
 const app = express();
 

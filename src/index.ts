@@ -1,9 +1,9 @@
 import 'dotenv/config';
 import cron from 'node-cron';
 import app from './app.js';
-import { config } from './config/index.js';
+import { config } from './platform/config/index.js';
 import { scannerService } from './container.js';
-import logger from './utils/logger.js';
+import logger from './platform/logger.js';
 
 const PORT = process.env.PORT || 3000;
 
