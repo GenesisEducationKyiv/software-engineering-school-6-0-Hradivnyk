@@ -1,14 +1,16 @@
 import request from 'supertest';
 import app from '../../src/app.js';
-import type { ISubscriptionService } from '../../src/interfaces/ISubscriptionService.js';
+import type {
+  ISubscriptionService,
+  Subscription,
+} from '../../src/modules/subscriptions/subscription.types.js';
 import {
   DuplicateSubscriptionError,
   RepositoryNotFoundError,
   TokenNotFoundError,
-} from '../../src/errors.js';
-import type { Subscription } from '../../src/types.js';
+} from '../../src/modules/subscriptions/subscription.errors.js';
 
-jest.mock('../../src/db/knex.js', () => ({}));
+jest.mock('../../src/platform/db/knex.js', () => ({}));
 
 // Provide a real SubscriptionController wired to a mock service so that
 // the full HTTP layer (validation, error handling) is exercised as-is.
@@ -18,8 +20,10 @@ jest.mock('../../src/container.js', () => {
   // variable is allowed.
   const {
     SubscriptionController,
-  }: typeof import('../../src/controllers/subscriptionController.js') =
-    jest.requireActual('../../src/controllers/subscriptionController.js');
+  }: typeof import('../../src/modules/subscriptions/subscription.controller.js') =
+    jest.requireActual(
+      '../../src/modules/subscriptions/subscription.controller.js',
+    );
 
   const service: { [K in keyof ISubscriptionService]: jest.Mock } = {
     subscribe: jest.fn(),

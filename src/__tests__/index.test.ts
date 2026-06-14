@@ -13,11 +13,11 @@ jest.mock('../app.js', () => ({
 jest.mock('../container.js', () => ({
   scannerService: { scan: jest.fn() },
 }));
-jest.mock('../utils/logger.js', () => ({
+jest.mock('../platform/logger.js', () => ({
   __esModule: true,
   default: { info: jest.fn(), error: jest.fn() },
 }));
-jest.mock('../config/index.js', () => ({
+jest.mock('../platform/config/index.js', () => ({
   config: {
     scanner: { cronSchedule: '30 6 * * *' },
   },
@@ -51,7 +51,7 @@ describe('index startup', () => {
 
     await import('../index.js');
 
-    const { config } = await import('../config/index.js');
+    const { config } = await import('../platform/config/index.js');
     expect(jest.mocked(cron).schedule).toHaveBeenCalledWith(
       config.scanner.cronSchedule,
       expect.any(Function),

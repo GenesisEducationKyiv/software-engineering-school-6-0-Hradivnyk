@@ -3,11 +3,11 @@ import {
   InvalidTokenError,
   RepositoryNotFoundError,
   TokenNotFoundError,
-} from '../../errors.js';
-import type { ISubscriptionModel } from '../../models/subscriptionModel.js';
-import type { IEmailService } from '../emailService.js';
-import type { IGithubService } from '../githubService.js';
-import { SubscriptionService } from '../subscriptionService.js';
+} from '../subscription.errors.js';
+import type { ISubscriptionModel } from '../subscription.model.js';
+import type { Notifier } from '../../notifications/index.js';
+import type { IGithubService } from '../../github/index.js';
+import { SubscriptionService } from '../subscription.service.js';
 
 const VALID_TOKEN = 'a'.repeat(64);
 const EMAIL = 'user@example.com';
@@ -16,7 +16,7 @@ const REPO = 'owner/repo';
 describe('SubscriptionService', () => {
   let service: SubscriptionService;
   let mockModel: jest.Mocked<ISubscriptionModel>;
-  let mockEmailService: jest.Mocked<IEmailService>;
+  let mockNotifier: jest.Mocked<Notifier>;
   let mockGithubService: jest.Mocked<IGithubService>;
 
   beforeEach(() => {
@@ -28,7 +28,7 @@ describe('SubscriptionService', () => {
       findAllConfirmedWithTokens: jest.fn(),
       findByEmail: jest.fn(),
     };
-    mockEmailService = {
+    mockNotifier = {
       sendConfirmationEmail: jest.fn(),
       sendNotificationEmail: jest.fn(),
     };
@@ -38,7 +38,7 @@ describe('SubscriptionService', () => {
     };
     service = new SubscriptionService(
       mockModel,
-      mockEmailService,
+      mockNotifier,
       mockGithubService,
     );
   });
@@ -48,7 +48,7 @@ describe('SubscriptionService', () => {
       mockGithubService.repositoryExists.mockResolvedValue(true);
       mockModel.existsByEmailAndRepo.mockResolvedValue(false);
       mockModel.create.mockResolvedValue(undefined);
-      mockEmailService.sendConfirmationEmail.mockResolvedValue(undefined);
+      mockNotifier.sendConfirmationEmail.mockResolvedValue(undefined);
     });
 
     it('should validate that the repository exists via githubService', async () => {
@@ -78,11 +78,11 @@ describe('SubscriptionService', () => {
       expect(confirmToken).not.toBe(unsubscribeToken);
     });
 
-    it('should call emailService to send a confirmation email', async () => {
+    it('should call notifier to send a confirmation email', async () => {
       await service.subscribe(EMAIL, REPO);
 
       const [, , confirmToken] = mockModel.create.mock.calls[0];
-      expect(mockEmailService.sendConfirmationEmail).toHaveBeenCalledWith(
+      expect(mockNotifier.sendConfirmationEmail).toHaveBeenCalledWith(
         EMAIL,
         confirmToken,
         REPO,

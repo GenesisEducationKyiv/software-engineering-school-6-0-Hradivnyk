@@ -4,9 +4,9 @@ import {
   DuplicateSubscriptionError,
   RepositoryNotFoundError,
   TokenNotFoundError,
-} from '../../errors.js';
-import { SubscriptionController } from '../subscriptionController.js';
-import type { ISubscriptionService } from '../../interfaces/ISubscriptionService.js';
+} from '../subscription.errors.js';
+import { SubscriptionController } from '../subscription.controller.js';
+import type { ISubscriptionService } from '../subscription.types.js';
 
 const VALID_TOKEN = 'a'.repeat(64);
 const EMAIL = 'user@example.com';
