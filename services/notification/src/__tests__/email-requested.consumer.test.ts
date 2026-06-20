@@ -59,4 +59,93 @@ describe('EmailRequestedConsumer', () => {
       'tok',
     );
   });
+
+  it('rejects a payload with a missing required field and sends nothing', async () => {
+    const broker = new InMemoryBroker();
+    const notifier = fakeNotifier();
+    await new EmailRequestedConsumer(broker, notifier, noopLogger).start();
+
+    // confirmation event without confirm_token
+    await expect(
+      broker.publish(EMAIL_REQUESTED, {
+        type: 'confirmation',
+        email: 'a@b.com',
+        repo: 'owner/repo',
+      }),
+    ).rejects.toThrow();
+
+    expect(notifier.sendConfirmationEmail).not.toHaveBeenCalled();
+    expect(notifier.sendNotificationEmail).not.toHaveBeenCalled();
+  });
+
+  it('rejects an event with an unknown type', async () => {
+    const broker = new InMemoryBroker();
+    const notifier = fakeNotifier();
+    await new EmailRequestedConsumer(broker, notifier, noopLogger).start();
+
+    await expect(
+      broker.publish(EMAIL_REQUESTED, {
+        type: 'password-reset',
+        email: 'a@b.com',
+        repo: 'owner/repo',
+      }),
+    ).rejects.toThrow();
+
+    expect(notifier.sendConfirmationEmail).not.toHaveBeenCalled();
+    expect(notifier.sendNotificationEmail).not.toHaveBeenCalled();
+  });
+
+  it('rejects a payload with a malformed email address', async () => {
+    const broker = new InMemoryBroker();
+    const notifier = fakeNotifier();
+    await new EmailRequestedConsumer(broker, notifier, noopLogger).start();
+
+    await expect(
+      broker.publish(EMAIL_REQUESTED, {
+        type: 'confirmation',
+        email: 'not-an-email',
+        repo: 'owner/repo',
+        confirm_token: 'tok',
+      }),
+    ).rejects.toThrow();
+
+    expect(notifier.sendConfirmationEmail).not.toHaveBeenCalled();
+  });
+
+  it('subscribes only once across repeated start() calls', async () => {
+    const broker = new InMemoryBroker();
+    const notifier = fakeNotifier();
+    const consumer = new EmailRequestedConsumer(broker, notifier, noopLogger);
+
+    await consumer.start();
+    await consumer.start();
+
+    await broker.publish(EMAIL_REQUESTED, {
+      type: 'confirmation',
+      email: 'a@b.com',
+      repo: 'owner/repo',
+      confirm_token: 'tok',
+    });
+
+    expect(notifier.sendConfirmationEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('propagates a notifier failure so the broker can nack the message', async () => {
+    const broker = new InMemoryBroker();
+    const notifier = fakeNotifier();
+    (notifier.sendNotificationEmail as jest.Mock).mockRejectedValue(
+      new Error('smtp down'),
+    );
+    await new EmailRequestedConsumer(broker, notifier, noopLogger).start();
+
+    await expect(
+      broker.publish(EMAIL_REQUESTED, {
+        type: 'notification',
+        email: 'a@b.com',
+        repo: 'owner/repo',
+        tag_name: 'v1',
+        unsubscribe_token: 'tok',
+      }),
+    ).rejects.toThrow('smtp down');
+  });
 });

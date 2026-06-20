@@ -22,6 +22,12 @@ module.exports = {
     },
     {
       ...baseConfig,
+      displayName: 'platform',
+      testMatch: ['<rootDir>/packages/**/__tests__/**/*.test.ts'],
+      setupFiles: [],
+    },
+    {
+      ...baseConfig,
       displayName: 'notification',
       testMatch: [
         '<rootDir>/services/notification/src/**/__tests__/**/*.test.ts',
