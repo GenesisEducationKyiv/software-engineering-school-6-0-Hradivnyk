@@ -37,7 +37,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run test:unit && npm run test:integration:ci && npm run test:e2e:ci",
-    "test:unit": "jest --selectProjects unit",
+    "test:unit": "jest --selectProjects unit notification",
     "test:unit:coverage": "npm run test:unit -- --coverage",
     "test:integration:ci": "node scripts/run-with-compose.cjs -f docker-compose.test.yml -- jest --selectProjects integration --runInBand",
     "test:integration:coverage": "npm run test:integration:ci -- --coverage",

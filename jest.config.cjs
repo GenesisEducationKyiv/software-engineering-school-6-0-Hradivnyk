@@ -20,6 +20,13 @@ module.exports = {
     },
     {
       ...baseConfig,
+      displayName: 'notification',
+      testMatch: [
+        '<rootDir>/services/notification/src/**/__tests__/**/*.test.ts',
+      ],
+    },
+    {
+      ...baseConfig,
       displayName: 'integration',
       testMatch: ['<rootDir>/tests/integration/**/*.test.ts'],
       globalSetup: '<rootDir>/tests/integration/global-setup.ts',

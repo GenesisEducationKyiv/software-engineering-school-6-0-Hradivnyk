@@ -1,0 +1,31 @@
+# Stage 1: builder — compile TypeScript
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+COPY .husky/install.mjs ./.husky/install.mjs
+COPY services/notification/package.json ./services/notification/
+RUN npm ci
+
+COPY services/notification ./services/notification
+
+RUN npx tsc -p services/notification/tsconfig.json
+
+# Stage 2: production — minimal runtime image
+FROM node:20-alpine AS production
+
+WORKDIR /app
+
+RUN apk add --no-cache curl
+
+COPY package*.json ./
+COPY .husky/install.mjs ./.husky/install.mjs
+COPY services/notification/package.json ./services/notification/
+RUN npm ci --omit=dev
+
+COPY --from=builder /app/services/notification/dist ./services/notification/dist
+
+ENV NODE_ENV=production
+
+CMD ["node", "services/notification/dist/index.js"]

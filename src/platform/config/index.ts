@@ -32,12 +32,9 @@ export const config = {
   github: {
     token: optional('GITHUB_TOKEN', ''),
   },
-  email: {
-    host: required('SMTP_HOST'),
-    port: Number.parseInt(optional('SMTP_PORT', '587')),
-    user: required('SMTP_USER'),
-    pass: required('SMTP_PASS'),
-    from: required('SMTP_FROM'),
+  notification: {
+    url: optional('NOTIFICATION_SERVICE_URL', 'http://localhost:4000'),
+    timeoutMs: Number.parseInt(optional('NOTIFICATION_TIMEOUT_MS', '5000')),
   },
   app: {
     baseUrl: optional('BASE_URL', 'http://localhost:3000'),

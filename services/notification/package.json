@@ -1,0 +1,26 @@
+{
+  "name": "@release-owl/notification",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "dotenv": "*",
+    "express": "*",
+    "nodemailer": "*",
+    "pino": "*",
+    "pino-http": "*",
+    "pino-pretty": "*",
+    "zod": "*"
+  },
+  "devDependencies": {
+    "@types/express": "*",
+    "@types/node": "*",
+    "@types/nodemailer": "*",
+    "tsx": "*"
+  }
+}
