@@ -1,8 +1,9 @@
 import knex from './platform/db/knex.js';
 import { config } from './platform/config/index.js';
 import logger from './platform/logger.js';
+import { RabbitMQBroker } from '@release-owl/platform';
 import { GithubService, FetchHttpClient } from './modules/github/index.js';
-import { NotificationHttpClient } from './modules/notifications/index.js';
+import { BrokerNotifier } from './modules/notifications/index.js';
 import { SubscriptionModel } from './modules/subscriptions/subscription.model.js';
 import { RepositoryModel } from './modules/subscriptions/repository.model.js';
 import { SubscriptionService } from './modules/subscriptions/subscription.service.js';
@@ -17,13 +18,9 @@ const githubService = new GithubService(
   config.github.token,
 );
 
-const notifier = new NotificationHttpClient(
-  {
-    baseUrl: config.notification.url,
-    timeoutMs: config.notification.timeoutMs,
-  },
-  logger,
-);
+export const broker = new RabbitMQBroker(config.rabbitmq.url, logger);
+
+const notifier = new BrokerNotifier(broker);
 
 const repositoryModel = new RepositoryModel(knex);
 const subscriptionModel = new SubscriptionModel(knex, repositoryModel);

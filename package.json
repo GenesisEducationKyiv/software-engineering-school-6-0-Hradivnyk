@@ -8,6 +8,8 @@
     "services/*"
   ],
   "dependencies": {
+    "@release-owl/contracts": "*",
+    "@release-owl/platform": "*",
     "cors": "^2.8.6",
     "dotenv": "^17.4.1",
     "express": "^5.2.1",
@@ -27,7 +29,9 @@
   "scripts": {
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build:packages": "tsc -p packages/contracts/tsconfig.json && tsc -p packages/platform/tsconfig.json",
+    "build": "npm run build:packages && tsc",
+    "build:services": "npm run build:packages && tsc -p services/notification/tsconfig.json",
     "migrate": "tsx src/migrate.ts",
     "migrate:rollback": "node --import tsx/esm node_modules/.bin/knex --knexfile knexfile.ts migrate:rollback",
     "migrate:make": "node --import tsx/esm node_modules/.bin/knex --knexfile knexfile.ts migrate:make",

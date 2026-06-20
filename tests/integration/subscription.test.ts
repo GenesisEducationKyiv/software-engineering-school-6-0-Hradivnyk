@@ -2,14 +2,14 @@ import request from 'supertest';
 import app from '../../src/app.js';
 import knex from '../../src/platform/db/knex.js';
 import { GithubService } from '../../src/modules/github/github.service.js';
-import { NotificationHttpClient } from '../../src/modules/notifications/notification.client.js';
+import { BrokerNotifier } from '../../src/modules/notifications/broker-notifier.js';
 import { subscriptionModel, repositoryModel } from '../../src/container.js';
 
 jest.mock('../../src/modules/github/github.service.js');
-jest.mock('../../src/modules/notifications/notification.client.js');
+jest.mock('../../src/modules/notifications/broker-notifier.js');
 
 const mockedGithub = jest.mocked(GithubService).prototype;
-const mockedEmail = jest.mocked(NotificationHttpClient).prototype;
+const mockedEmail = jest.mocked(BrokerNotifier).prototype;
 
 const EMAIL = 'integration@example.com';
 const REPO = 'owner/repo';

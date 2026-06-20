@@ -32,9 +32,8 @@ export const config = {
   github: {
     token: optional('GITHUB_TOKEN', ''),
   },
-  notification: {
-    url: optional('NOTIFICATION_SERVICE_URL', 'http://localhost:4000'),
-    timeoutMs: Number.parseInt(optional('NOTIFICATION_TIMEOUT_MS', '5000')),
+  rabbitmq: {
+    url: optional('RABBITMQ_URL', 'amqp://localhost:5672'),
   },
   app: {
     baseUrl: optional('BASE_URL', 'http://localhost:3000'),

@@ -6,6 +6,8 @@ const baseConfig = {
   },
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^@release-owl/contracts$': '<rootDir>/packages/contracts/src/index.ts',
+    '^@release-owl/platform$': '<rootDir>/packages/platform/src/index.ts',
   },
   setupFiles: ['<rootDir>/src/__tests__/setup.ts'],
 };
@@ -24,6 +26,7 @@ module.exports = {
       testMatch: [
         '<rootDir>/services/notification/src/**/__tests__/**/*.test.ts',
       ],
+      setupFiles: [],
     },
     {
       ...baseConfig,

@@ -12,6 +12,10 @@ jest.mock('../app.js', () => ({
 }));
 jest.mock('../container.js', () => ({
   scannerService: { scan: jest.fn(), start: jest.fn() },
+  broker: {
+    connect: jest.fn().mockResolvedValue(undefined),
+    close: jest.fn().mockResolvedValue(undefined),
+  },
 }));
 jest.mock('../platform/logger.js', () => ({
   __esModule: true,
@@ -19,9 +23,14 @@ jest.mock('../platform/logger.js', () => ({
 }));
 jest.mock('../platform/config/index.js', () => ({
   config: {
+    server: { port: 3000 },
     scanner: { cronSchedule: '30 6 * * *' },
   },
 }));
+
+const flushAsync = async (): Promise<void> => {
+  await new Promise((resolve) => setImmediate(resolve));
+};
 
 describe('index startup', () => {
   beforeEach(() => {
@@ -50,6 +59,9 @@ describe('index startup', () => {
     }) as typeof app.listen);
 
     await import('../index.js');
+    // broker.connect() is awaited before app.listen(), so let the
+    // microtask/macrotask queue drain before asserting.
+    await flushAsync();
 
     const { scannerService } = await import('../container.js');
     expect(jest.mocked(scannerService.start)).toHaveBeenCalled();
