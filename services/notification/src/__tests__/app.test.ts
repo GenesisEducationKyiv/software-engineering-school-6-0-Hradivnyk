@@ -27,11 +27,14 @@ describe('notification HTTP service', () => {
     expect(res.body).toEqual({ status: 'ok' });
   });
 
-  it('POST /api/notify/confirmation sends and returns 202', async () => {
+  it('POST /api/notify dispatches a confirmation email and returns 202', async () => {
     const { app, notifier } = build({});
-    const res = await request(app)
-      .post('/api/notify/confirmation')
-      .send({ email: 'a@b.com', token: 'tok', repo: 'owner/repo' });
+    const res = await request(app).post('/api/notify').send({
+      type: 'confirmation',
+      email: 'a@b.com',
+      repo: 'owner/repo',
+      confirm_token: 'tok',
+    });
 
     expect(res.status).toBe(202);
     expect(notifier.sendConfirmationEmail).toHaveBeenCalledWith(
@@ -41,11 +44,15 @@ describe('notification HTTP service', () => {
     );
   });
 
-  it('POST /api/notify/release sends and returns 202', async () => {
+  it('POST /api/notify dispatches a notification email and returns 202', async () => {
     const { app, notifier } = build({});
-    const res = await request(app)
-      .post('/api/notify/release')
-      .send({ email: 'a@b.com', repo: 'owner/repo', tag: 'v1', token: 'tok' });
+    const res = await request(app).post('/api/notify').send({
+      type: 'notification',
+      email: 'a@b.com',
+      repo: 'owner/repo',
+      tag_name: 'v1',
+      unsubscribe_token: 'tok',
+    });
 
     expect(res.status).toBe(202);
     expect(notifier.sendNotificationEmail).toHaveBeenCalledWith(
@@ -58,21 +65,39 @@ describe('notification HTTP service', () => {
 
   it('rejects an invalid payload with 400', async () => {
     const { app, notifier } = build({});
-    const res = await request(app)
-      .post('/api/notify/confirmation')
-      .send({ email: 'not-an-email', repo: 'owner/repo' });
+    const res = await request(app).post('/api/notify').send({
+      type: 'confirmation',
+      email: 'not-an-email',
+      repo: 'owner/repo',
+    });
 
     expect(res.status).toBe(400);
     expect(notifier.sendConfirmationEmail).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown template type with 400', async () => {
+    const { app, notifier } = build({});
+    const res = await request(app).post('/api/notify').send({
+      type: 'unknown',
+      email: 'a@b.com',
+      repo: 'owner/repo',
+    });
+
+    expect(res.status).toBe(400);
+    expect(notifier.sendConfirmationEmail).not.toHaveBeenCalled();
+    expect(notifier.sendNotificationEmail).not.toHaveBeenCalled();
   });
 
   it('returns 502 when the notifier fails', async () => {
     const { app } = build({
       sendConfirmationEmail: jest.fn().mockRejectedValue(new Error('smtp')),
     });
-    const res = await request(app)
-      .post('/api/notify/confirmation')
-      .send({ email: 'a@b.com', token: 'tok', repo: 'owner/repo' });
+    const res = await request(app).post('/api/notify').send({
+      type: 'confirmation',
+      email: 'a@b.com',
+      repo: 'owner/repo',
+      confirm_token: 'tok',
+    });
 
     expect(res.status).toBe(502);
   });

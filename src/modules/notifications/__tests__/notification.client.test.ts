@@ -23,34 +23,36 @@ describe('NotificationHttpClient', () => {
     );
   }
 
-  it('POSTs confirmation requests to the notification service', async () => {
+  it('POSTs confirmation requests to the unified notify endpoint', async () => {
     fetchMock.mockResolvedValue({ ok: true, status: 202 });
 
     await client().sendConfirmationEmail('a@b.com', 'tok', 'owner/repo');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://notification:4000/api/notify/confirmation');
+    expect(url).toBe('http://notification:4000/api/notify');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body as string)).toEqual({
+      type: 'confirmation',
       email: 'a@b.com',
-      token: 'tok',
       repo: 'owner/repo',
+      confirm_token: 'tok',
     });
   });
 
-  it('POSTs release requests to the notification service', async () => {
+  it('POSTs release requests to the unified notify endpoint', async () => {
     fetchMock.mockResolvedValue({ ok: true, status: 202 });
 
     await client().sendNotificationEmail('a@b.com', 'owner/repo', 'v1', 'tok');
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://notification:4000/api/notify/release');
+    expect(url).toBe('http://notification:4000/api/notify');
     expect(JSON.parse(init.body as string)).toEqual({
+      type: 'notification',
       email: 'a@b.com',
       repo: 'owner/repo',
-      tag: 'v1',
-      token: 'tok',
+      tag_name: 'v1',
+      unsubscribe_token: 'tok',
     });
   });
 

@@ -9,6 +9,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@release-owl/contracts": "*",
     "dotenv": "*",
     "express": "*",
     "nodemailer": "*",

@@ -2,12 +2,14 @@ import express from 'express';
 import type { Request, Response, NextFunction, Express } from 'express';
 import type { Notifier } from './email.service.js';
 import type { ILogger } from './logger.js';
-import { ConfirmationRequestSchema, ReleaseRequestSchema } from './schemas.js';
+import { EmailRequestedPayloadSchema } from '@release-owl/contracts';
 
 /**
- * Builds the notification HTTP service. The REST endpoints are the integration
- * contract between the API monolith and this service (synchronous
- * request–response), replacing what would otherwise be a message queue.
+ * Builds the notification HTTP service. The single `/api/notify` endpoint is the
+ * integration contract between the API monolith and this service (synchronous
+ * request–response), replacing what would otherwise be a message queue. The body
+ * is a discriminated union keyed by `type`, so a new email kind is added as a new
+ * union variant plus a dispatch case here — without adding a new endpoint.
  */
 export function createApp(notifier: Notifier, logger: ILogger): Express {
   const app = express();
@@ -18,41 +20,44 @@ export function createApp(notifier: Notifier, logger: ILogger): Express {
   });
 
   app.post(
-    '/api/notify/confirmation',
+    '/api/notify',
     async (req: Request, res: Response): Promise<void> => {
-      const parsed = ConfirmationRequestSchema.safeParse(req.body);
+      const parsed = EmailRequestedPayloadSchema.safeParse(req.body);
       if (!parsed.success) {
         res
           .status(400)
           .json({ error: 'invalid_request', details: parsed.error.flatten() });
         return;
       }
-      const { email, token, repo } = parsed.data;
-      await notifier.sendConfirmationEmail(email, token, repo);
-      logger.info(
-        { event: 'notify.confirmation_sent', repo },
-        'Confirmation email sent',
-      );
-      res.status(202).json({ status: 'sent' });
-    },
-  );
+      const payload = parsed.data;
 
-  app.post(
-    '/api/notify/release',
-    async (req: Request, res: Response): Promise<void> => {
-      const parsed = ReleaseRequestSchema.safeParse(req.body);
-      if (!parsed.success) {
-        res
-          .status(400)
-          .json({ error: 'invalid_request', details: parsed.error.flatten() });
-        return;
+      if (payload.type === 'confirmation') {
+        await notifier.sendConfirmationEmail(
+          payload.email,
+          payload.confirm_token,
+          payload.repo,
+        );
+        logger.info(
+          { event: 'notify.confirmation_sent', repo: payload.repo },
+          'Confirmation email sent',
+        );
+      } else {
+        await notifier.sendNotificationEmail(
+          payload.email,
+          payload.repo,
+          payload.tag_name,
+          payload.unsubscribe_token,
+        );
+        logger.info(
+          {
+            event: 'notify.release_sent',
+            repo: payload.repo,
+            tag: payload.tag_name,
+          },
+          'Release email sent',
+        );
       }
-      const { email, repo, tag, token } = parsed.data;
-      await notifier.sendNotificationEmail(email, repo, tag, token);
-      logger.info(
-        { event: 'notify.release_sent', repo, tag },
-        'Release email sent',
-      );
+
       res.status(202).json({ status: 'sent' });
     },
   );

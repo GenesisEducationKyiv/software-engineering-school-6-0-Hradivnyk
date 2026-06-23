@@ -3,10 +3,14 @@
   "compilerOptions": {
     "rootDir": ".",
     "noEmit": true,
-    "types": ["jest", "node"]
+    "types": ["jest", "node"],
+    "paths": {
+      "@release-owl/contracts": ["./packages/contracts/src/index.ts"]
+    }
   },
   "include": [
     "src/**/*",
+    "packages/**/*",
     "services/**/*",
     "tests/**/*",
     "e2e/**/*",

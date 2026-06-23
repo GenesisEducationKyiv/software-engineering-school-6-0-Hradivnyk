@@ -1,4 +1,5 @@
 import type { ILogger } from '../../platform/logger.js';
+import type { EmailRequestedPayload } from '@release-owl/contracts';
 
 export interface Notifier {
   sendConfirmationEmail(
@@ -24,6 +25,10 @@ export interface NotificationClientConfig {
  * request–response). Email composition and SMTP delivery live in that service;
  * the monolith only fires a request and waits for acknowledgement.
  *
+ * Every email kind goes to a single `/api/notify` endpoint with a discriminated
+ * payload keyed by `type` — the same contract the broker event uses — so adding
+ * a new email kind never requires a new endpoint here.
+ *
  * An {@link AbortController} timeout keeps a slow/unhealthy notification service
  * from blocking the calling business operation indefinitely.
  */
@@ -42,7 +47,12 @@ export class NotificationHttpClient implements Notifier {
     token: string,
     repo: string,
   ): Promise<void> {
-    await this.post('/api/notify/confirmation', { email, token, repo });
+    await this.post({
+      type: 'confirmation',
+      email,
+      repo,
+      confirm_token: token,
+    });
   }
 
   async sendNotificationEmail(
@@ -51,17 +61,24 @@ export class NotificationHttpClient implements Notifier {
     tag: string,
     token: string,
   ): Promise<void> {
-    await this.post('/api/notify/release', { email, repo, tag, token });
+    await this.post({
+      type: 'notification',
+      email,
+      repo,
+      tag_name: tag,
+      unsubscribe_token: token,
+    });
   }
 
-  private async post(path: string, body: unknown): Promise<void> {
+  private async post(payload: EmailRequestedPayload): Promise<void> {
+    const path = '/api/notify';
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.config.timeoutMs);
     try {
       const response = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
       if (!response.ok) {

@@ -6,6 +6,7 @@ const baseConfig = {
   },
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^@release-owl/contracts$': '<rootDir>/packages/contracts/src/index.ts',
   },
   setupFiles: ['<rootDir>/src/__tests__/setup.ts'],
 };
