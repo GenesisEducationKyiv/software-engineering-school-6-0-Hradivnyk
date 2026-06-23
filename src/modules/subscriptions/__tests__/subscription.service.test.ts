@@ -22,7 +22,7 @@ describe('SubscriptionService', () => {
   beforeEach(() => {
     mockModel = {
       create: jest.fn(),
-      existsByEmailAndRepo: jest.fn(),
+      hasConfirmedSubscription: jest.fn(),
       confirm: jest.fn(),
       deleteByUnsubscribeToken: jest.fn(),
       findAllConfirmedWithTokens: jest.fn(),
@@ -46,7 +46,7 @@ describe('SubscriptionService', () => {
   describe('subscribe', () => {
     beforeEach(() => {
       mockGithubService.repositoryExists.mockResolvedValue(true);
-      mockModel.existsByEmailAndRepo.mockResolvedValue(false);
+      mockModel.hasConfirmedSubscription.mockResolvedValue(false);
       mockModel.create.mockResolvedValue(undefined);
       mockNotifier.sendConfirmationEmail.mockResolvedValue(undefined);
     });
@@ -97,12 +97,32 @@ describe('SubscriptionService', () => {
       );
     });
 
-    it('should throw DuplicateSubscriptionError if subscription already exists for email and repo', async () => {
-      mockModel.existsByEmailAndRepo.mockResolvedValue(true);
+    it('should throw DuplicateSubscriptionError if a confirmed subscription already exists for email and repo', async () => {
+      mockModel.hasConfirmedSubscription.mockResolvedValue(true);
 
       await expect(service.subscribe(EMAIL, REPO)).rejects.toThrow(
         DuplicateSubscriptionError,
       );
+    });
+
+    it('should persist the subscription before sending the confirmation email', async () => {
+      await service.subscribe(EMAIL, REPO);
+
+      const createOrder = mockModel.create.mock.invocationCallOrder[0];
+      const sendOrder =
+        mockNotifier.sendConfirmationEmail.mock.invocationCallOrder[0];
+      expect(createOrder).toBeLessThan(sendOrder);
+    });
+
+    it('should keep the persisted subscription even if sending the confirmation email fails', async () => {
+      mockNotifier.sendConfirmationEmail.mockRejectedValue(
+        new Error('notification timeout'),
+      );
+
+      await expect(service.subscribe(EMAIL, REPO)).rejects.toThrow(
+        'notification timeout',
+      );
+      expect(mockModel.create).toHaveBeenCalled();
     });
   });
 

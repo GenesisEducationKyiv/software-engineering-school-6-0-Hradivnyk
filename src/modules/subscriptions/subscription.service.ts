@@ -36,11 +36,9 @@ export class SubscriptionService implements ISubscriptionService {
       throw new RepositoryNotFoundError(repo);
     }
 
-    const alreadySubscribed = await this.subscriptionModel.existsByEmailAndRepo(
-      email,
-      repo,
-    );
-    if (alreadySubscribed) {
+    const alreadyConfirmed =
+      await this.subscriptionModel.hasConfirmedSubscription(email, repo);
+    if (alreadyConfirmed) {
       logger.warn(
         { event: 'subscription.duplicate', emailHash: hashEmail(email), repo },
         'Duplicate subscription attempt',
@@ -55,13 +53,17 @@ export class SubscriptionService implements ISubscriptionService {
     const confirmToken = crypto.randomBytes(32).toString('hex');
     const unsubscribeToken = crypto.randomBytes(32).toString('hex');
 
-    await this.notifier.sendConfirmationEmail(email, confirmToken, repo);
+    // Persist before sending. If the send times out *after* the email is actually
+    // delivered, the confirmation link must still resolve — so the record has to
+    // exist first. A genuine send failure leaves a pending row that a re-subscribe
+    // resends (create is idempotent on email+repo), so no delivered token is stranded.
     await this.subscriptionModel.create(
       email,
       repo,
       confirmToken,
       unsubscribeToken,
     );
+    await this.notifier.sendConfirmationEmail(email, confirmToken, repo);
     subscriptionOperationsTotal.inc({
       operation: 'subscribe',
       result: 'success',
