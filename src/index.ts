@@ -2,7 +2,7 @@ import 'dotenv/config';
 import cron from 'node-cron';
 import app from './app.js';
 import { config } from './platform/config/index.js';
-import { broker, scannerService } from './container.js';
+import { broker, scannerService, outboxRelay } from './container.js';
 import logger from './platform/logger.js';
 
 const PORT = config.server.port;
@@ -16,6 +16,8 @@ if (!cron.validate(config.scanner.cronSchedule)) {
 
 async function startApp(): Promise<void> {
   await broker.connect();
+  // Start only after the broker is connected so publishes have somewhere to go.
+  outboxRelay.start();
 
   const server = app.listen(PORT, () => {
     logger.info({ event: 'server.started', port: PORT }, 'Server started');
@@ -35,6 +37,8 @@ async function startApp(): Promise<void> {
       );
       process.exit(1);
     }, SHUTDOWN_TIMEOUT_MS);
+
+    outboxRelay.stop();
 
     server.close(() => {
       clearTimeout(timer);

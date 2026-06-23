@@ -41,6 +41,7 @@ async function getTokens(email = EMAIL, repo = REPO) {
 }
 
 beforeEach(async () => {
+  await knex('outbox').delete();
   await knex('subscriptions').delete();
   await knex('repositories').delete();
   jest.clearAllMocks();
@@ -76,7 +77,7 @@ describe('API key authentication', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /api/subscribe', () => {
-  it('returns 200 and persists a pending subscription', async () => {
+  it('returns 200, persists a pending subscription, and enqueues a confirmation event', async () => {
     const res = await subscribe();
 
     expect(res.status).toBe(200);
@@ -86,11 +87,20 @@ describe('POST /api/subscribe', () => {
       .where({ email: EMAIL, repo: REPO })
       .first();
     expect(sub).toMatchObject({ email: EMAIL, repo: REPO, status: 'pending' });
-    expect(mockedEmail.sendConfirmationEmail).toHaveBeenCalledWith(
-      EMAIL,
-      expect.stringMatching(/^[0-9a-f]{64}$/),
-      REPO,
-    );
+
+    // The email is not sent inline; an outbox row is committed in the same
+    // transaction and published to the broker later by the relay.
+    const events = await knex('outbox').where({
+      routing_key: 'email.requested',
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].published_at).toBeNull();
+    expect(events[0].payload).toMatchObject({
+      type: 'confirmation',
+      email: EMAIL,
+      repo: REPO,
+      confirm_token: sub.confirm_token,
+    });
   });
 
   it('does not fail when the same repo is used for a different email', async () => {

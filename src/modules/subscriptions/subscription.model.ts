@@ -17,6 +17,7 @@ export interface ISubscriptionModel {
     repo: string,
     confirmToken: string,
     unsubscribeToken: string,
+    trx?: Knex,
   ): Promise<void>;
   existsByEmailAndRepo(email: string, repo: string): Promise<boolean>;
   confirm(
@@ -35,15 +36,18 @@ export class SubscriptionModel implements ISubscriptionModel {
     private readonly repositoryModel: IRepositoryModel,
   ) {}
 
-  // Ensures the repository exists, then inserts a new pending subscription with both tokens.
+  // Ensures the repository exists, then inserts a new pending subscription with both
+  // tokens. Accepts a transaction so the insert can be committed atomically with the
+  // outbox event that triggers the confirmation email.
   async create(
     email: string,
     repo: string,
     confirmToken: string,
     unsubscribeToken: string,
+    trx?: Knex,
   ): Promise<void> {
-    await this.repositoryModel.upsert(repo);
-    await this.db('subscriptions').insert({
+    await this.repositoryModel.upsert(repo, trx);
+    await (trx ?? this.db)('subscriptions').insert({
       email,
       repo,
       confirm_token: confirmToken,

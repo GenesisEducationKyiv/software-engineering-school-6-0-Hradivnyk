@@ -16,6 +16,7 @@ jest.mock('../container.js', () => ({
     connect: jest.fn().mockResolvedValue(undefined),
     close: jest.fn().mockResolvedValue(undefined),
   },
+  outboxRelay: { start: jest.fn(), stop: jest.fn() },
 }));
 jest.mock('../platform/logger.js', () => ({
   __esModule: true,

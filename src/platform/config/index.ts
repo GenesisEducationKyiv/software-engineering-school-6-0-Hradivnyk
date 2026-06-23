@@ -42,6 +42,12 @@ export const config = {
   scanner: {
     cronSchedule: optional('SCANNER_CRON_SCHEDULE', '0 * * * *'),
   },
+  outbox: {
+    pollIntervalMs: Number.parseInt(
+      optional('OUTBOX_POLL_INTERVAL_MS', '1000'),
+    ),
+    batchSize: Number.parseInt(optional('OUTBOX_BATCH_SIZE', '50')),
+  },
   auth: {
     apiKey: required('API_KEY'),
   },
