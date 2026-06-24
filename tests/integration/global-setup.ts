@@ -28,7 +28,13 @@ export default async function globalSetup(): Promise<void> {
     );
   }
 
-  const migrationsDir = join(process.cwd(), 'src', 'db', 'migrations');
+  const migrationsDir = join(
+    process.cwd(),
+    'src',
+    'platform',
+    'db',
+    'migrations',
+  );
 
   // A fresh knex instance is created on every attempt.
   //

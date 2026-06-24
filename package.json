@@ -28,7 +28,7 @@
   "scripts": {
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "npm run build -w packages/contracts && tsc",
     "migrate": "tsx src/migrate.ts",
     "migrate:rollback": "node --import tsx/esm node_modules/.bin/knex --knexfile knexfile.ts migrate:rollback",
     "migrate:make": "node --import tsx/esm node_modules/.bin/knex --knexfile knexfile.ts migrate:make",

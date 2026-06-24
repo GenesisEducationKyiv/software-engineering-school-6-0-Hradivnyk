@@ -4,6 +4,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
+COPY packages ./packages
+COPY services/notification/package.json ./services/notification/
 COPY .husky/install.mjs ./.husky/install.mjs
 RUN npm ci
 
@@ -19,6 +21,8 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 COPY package*.json ./
+COPY packages ./packages
+COPY services/notification/package.json ./services/notification/
 COPY .husky/install.mjs ./.husky/install.mjs
 RUN npm ci --omit=dev
 

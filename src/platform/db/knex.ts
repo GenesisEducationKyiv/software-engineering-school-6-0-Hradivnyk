@@ -10,6 +10,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const migrationsDir = join(
   process.cwd(),
   isProduction ? 'dist' : 'src',
+  'platform',
   'db',
   'migrations',
 );
