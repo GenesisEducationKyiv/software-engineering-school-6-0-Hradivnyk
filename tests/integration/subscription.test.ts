@@ -144,7 +144,11 @@ describe('POST /api/subscribe', () => {
     const res = await subscribe();
 
     expect(res.status).toBe(200);
-    expect(mockedEmail.sendConfirmationEmail).toHaveBeenCalledTimes(2);
+
+    const events = await knex('outbox').where({
+      routing_key: 'email.requested',
+    });
+    expect(events).toHaveLength(2);
 
     const rows = await knex('subscriptions').where({
       email: EMAIL,

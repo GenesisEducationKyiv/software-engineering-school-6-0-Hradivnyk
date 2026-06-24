@@ -66,21 +66,21 @@ flowchart TD
 
 ### 2.2 Non-Functional Requirements
 
-| Category            | Requirement                          | Target                                                            |
-| ------------------- | ------------------------------------ | ----------------------------------------------------------------- |
-| **Availability**    | Service uptime                       | ≥ 99% (single-instance EC2)                                       |
-| **Scalability**     | Number of monitored repositories     | Up to 1,000 without architectural changes                         |
-| **Reliability**     | Confirmation email delivery          | Transactional outbox guarantees at-least-once delivery to broker  |
-| **Reliability**     | SMTP transient failures              | Notification service retries with exponential backoff (3 attempts)|
-| **Reliability**     | Single email send failure            | Does not stop processing other subscribers (`Promise.allSettled`) |
-| **Reliability**     | Scanner crash                        | Does not affect HTTP request handling (graceful logging)          |
-| **Reliability**     | Broker connection loss               | `RabbitMQBroker` reconnects automatically (up to 10 retries)     |
-| **Security**        | Brute-force protection               | Rate limiting: 100 req / 15 min / IP                              |
-| **Security**        | API endpoint protection              | `X-API-Key` with timing-safe comparison (required)               |
-| **Security**        | Transport                            | TLS via Caddy (Let's Encrypt) in production                       |
-| **Configurability** | Start without required env variables | Fail-fast on startup                                              |
-| **Maintainability** | Structured JSON logging              | Pino, DEBUG/INFO/ERROR levels                                     |
-| **Testability**     | Unit + integration test coverage     | Jest + Supertest                                                  |
+| Category            | Requirement                          | Target                                                             |
+| ------------------- | ------------------------------------ | ------------------------------------------------------------------ |
+| **Availability**    | Service uptime                       | ≥ 99% (single-instance EC2)                                        |
+| **Scalability**     | Number of monitored repositories     | Up to 1,000 without architectural changes                          |
+| **Reliability**     | Confirmation email delivery          | Transactional outbox guarantees at-least-once delivery to broker   |
+| **Reliability**     | SMTP transient failures              | Notification service retries with exponential backoff (3 attempts) |
+| **Reliability**     | Single email send failure            | Does not stop processing other subscribers (`Promise.allSettled`)  |
+| **Reliability**     | Scanner crash                        | Does not affect HTTP request handling (graceful logging)           |
+| **Reliability**     | Broker connection loss               | `RabbitMQBroker` reconnects automatically (up to 10 retries)       |
+| **Security**        | Brute-force protection               | Rate limiting: 100 req / 15 min / IP                               |
+| **Security**        | API endpoint protection              | `X-API-Key` with timing-safe comparison (required)                 |
+| **Security**        | Transport                            | TLS via Caddy (Let's Encrypt) in production                        |
+| **Configurability** | Start without required env variables | Fail-fast on startup                                               |
+| **Maintainability** | Structured JSON logging              | Pino, DEBUG/INFO/ERROR levels                                      |
+| **Testability**     | Unit + integration test coverage     | Jest + Supertest                                                   |
 
 ---
 
@@ -124,10 +124,10 @@ flowchart TD
 
 ### 4.2 Data
 
-| Table           | Row size (estimate) | Rows  | Volume  |
-| --------------- | ------------------- | ----- | ------- |
-| `repositories`  | ~100 bytes          | 300   | ~30 KB  |
-| `subscriptions` | ~300 bytes          | 1,000 | ~300 KB |
+| Table           | Row size (estimate) | Rows                | Volume                     |
+| --------------- | ------------------- | ------------------- | -------------------------- |
+| `repositories`  | ~100 bytes          | 300                 | ~30 KB                     |
+| `subscriptions` | ~300 bytes          | 1,000               | ~300 KB                    |
 | `outbox`        | ~500 bytes          | ~20/day (transient) | Rows deleted after publish |
 
 **Growth:** +20 subscriptions/day = 6 KB/day → **2 MB/year**. PostgreSQL thresholds are not a concern at any realistic volume.
@@ -266,12 +266,12 @@ errorHandler()                  → centralized error handling
 
 Coordinates the full subscription lifecycle:
 
-| Method                    | Action                                                                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Method                    | Action                                                                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `subscribe(email, repo)`  | Validates repo → checks for duplicate → generates tokens (`crypto.randomBytes(32)`) → persists subscription + outbox event in one DB transaction |
-| `confirm(token)`          | Validates token format (hex 64) → updates status to `confirmed`                                                                 |
-| `unsubscribe(token)`      | Validates format → deletes the subscription row                                                                                 |
-| `getSubscriptions(email)` | Returns all subscriptions for the given email                                                                                   |
+| `confirm(token)`          | Validates token format (hex 64) → updates status to `confirmed`                                                                                  |
+| `unsubscribe(token)`      | Validates format → deletes the subscription row                                                                                                  |
+| `getSubscriptions(email)` | Returns all subscriptions for the given email                                                                                                    |
 
 **Key detail:** the subscription row and the `email.requested` outbox event are written in a single transaction. The outbox relay later publishes the event to RabbitMQ, decoupling the HTTP response from broker availability and preventing lost confirmation emails even if the broker is temporarily down.
 
@@ -301,9 +301,9 @@ Implements the [transactional outbox pattern](https://microservices.io/patterns/
 
 Topic exchange `release-owl.events`. All events are persistent (survive broker restart):
 
-| Event routing key  | Producer            | Consumer                     | Queue                          |
-| ------------------ | ------------------- | ---------------------------- | ------------------------------ |
-| `email.requested`  | `app` (outbox relay / scanner) | `notification` service | `notification.email-requested` |
+| Event routing key | Producer                       | Consumer               | Queue                          |
+| ----------------- | ------------------------------ | ---------------------- | ------------------------------ |
+| `email.requested` | `app` (outbox relay / scanner) | `notification` service | `notification.email-requested` |
 
 `RabbitMQBroker` (in `@release-owl/platform`) handles connection retries with exponential backoff (up to 10 attempts, capped at 30 s) and automatic reconnection on connection loss.
 
@@ -328,12 +328,12 @@ Without `GITHUB_TOKEN` — 60 req/hour; with token — 5,000 req/hour.
 
 Standalone Node.js process (`services/notification`). Responsibilities:
 
-| Component               | Role                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------- |
-| `EmailRequestedConsumer`| Subscribes to `email.requested` on RabbitMQ; dispatches to email sender              |
-| `RetryingEmailSender`   | Wraps Nodemailer; retries transient SMTP failures with exponential backoff            |
-| `EmailTemplateBuilder`  | Renders confirmation and notification email HTML                                      |
-| Health server           | Minimal HTTP server on `:3002` — returns `{"status":"ok"}` for Docker health checks  |
+| Component                | Role                                                                                |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| `EmailRequestedConsumer` | Subscribes to `email.requested` on RabbitMQ; dispatches to email sender             |
+| `RetryingEmailSender`    | Wraps Nodemailer; retries transient SMTP failures with exponential backoff          |
+| `EmailTemplateBuilder`   | Renders confirmation and notification email HTML                                    |
+| Health server            | Minimal HTTP server on `:3002` — returns `{"status":"ok"}` for Docker health checks |
 
 Email types:
 
@@ -450,10 +450,10 @@ node dist/migrate.js   # knex migrate:latest
 node dist/index.js     # start the service
 ```
 
-| Migration file                                    | Change                                          |
-| ------------------------------------------------- | ----------------------------------------------- |
-| `001_create_repositories_and_subscriptions.ts`    | Creates `repositories` and `subscriptions` tables |
-| `002_create_outbox.ts`                            | Creates `outbox` table with relay index         |
+| Migration file                                 | Change                                            |
+| ---------------------------------------------- | ------------------------------------------------- |
+| `001_create_repositories_and_subscriptions.ts` | Creates `repositories` and `subscriptions` tables |
+| `002_create_outbox.ts`                         | Creates `outbox` table with relay index           |
 
 ---
 
@@ -689,19 +689,19 @@ The project uses **Jest** as the test runner with **Supertest** for HTTP-layer i
 
 **Unit tests** (`src/**/__tests__/`, `services/**/__tests__/`) mock all external dependencies (database, GitHub API, broker) and verify business logic in isolation:
 
-| File                                                    | What is tested                                                             |
-| ------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `src/modules/subscriptions/__tests__/subscription.service.test.ts`  | Subscribe, confirm, unsubscribe, duplicate detection, outbox enqueue       |
-| `src/modules/releases/__tests__/scanner.service.test.ts`            | Scan cycle: grouping by repo, new release detection, notification dispatch |
-| `src/modules/releases/__tests__/release.handler.test.ts`            | Release handling, `Promise.allSettled` failure isolation, tag update       |
-| `src/modules/github/__tests__/github.service.test.ts`               | Repository existence check, latest release fetch, rate limit handling      |
-| `src/modules/notifications/__tests__/broker-notifier.test.ts`       | Broker publish calls for confirmation and notification events              |
-| `src/modules/outbox/__tests__/outbox.relay.test.ts`                 | Outbox drain batching, at-least-once publish, concurrent drain skip        |
-| `src/modules/subscriptions/__tests__/subscription.controller.test.ts`| Request validation, error mapping to HTTP status codes                    |
-| `src/platform/http/__tests__/api-key-auth.test.ts`                  | Timing-safe API key comparison, missing/invalid key rejection              |
-| `packages/platform/src/broker/__tests__/rabbitmq.broker.test.ts`    | RabbitMQ publish, subscribe, reconnect, dead-letter on handler failure     |
-| `services/notification/src/__tests__/email-requested.consumer.test.ts` | Consumer dispatch for confirmation/notification types                   |
-| `services/notification/src/__tests__/retrying-email.sender.test.ts` | Retry logic with exponential backoff, exhaustion behaviour                 |
+| File                                                                   | What is tested                                                             |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `src/modules/subscriptions/__tests__/subscription.service.test.ts`     | Subscribe, confirm, unsubscribe, duplicate detection, outbox enqueue       |
+| `src/modules/releases/__tests__/scanner.service.test.ts`               | Scan cycle: grouping by repo, new release detection, notification dispatch |
+| `src/modules/releases/__tests__/release.handler.test.ts`               | Release handling, `Promise.allSettled` failure isolation, tag update       |
+| `src/modules/github/__tests__/github.service.test.ts`                  | Repository existence check, latest release fetch, rate limit handling      |
+| `src/modules/notifications/__tests__/broker-notifier.test.ts`          | Broker publish calls for confirmation and notification events              |
+| `src/modules/outbox/__tests__/outbox.relay.test.ts`                    | Outbox drain batching, at-least-once publish, concurrent drain skip        |
+| `src/modules/subscriptions/__tests__/subscription.controller.test.ts`  | Request validation, error mapping to HTTP status codes                     |
+| `src/platform/http/__tests__/api-key-auth.test.ts`                     | Timing-safe API key comparison, missing/invalid key rejection              |
+| `packages/platform/src/broker/__tests__/rabbitmq.broker.test.ts`       | RabbitMQ publish, subscribe, reconnect, dead-letter on handler failure     |
+| `services/notification/src/__tests__/email-requested.consumer.test.ts` | Consumer dispatch for confirmation/notification types                      |
+| `services/notification/src/__tests__/retrying-email.sender.test.ts`    | Retry logic with exponential backoff, exhaustion behaviour                 |
 
 **Integration tests** (`tests/integration/subscription.test.ts`) spin up the full Express application and verify end-to-end HTTP flows: subscribe → confirm → receive notification → unsubscribe. All external dependencies (broker, SMTP) are replaced with in-memory fakes, so the full suite runs without any external services.
 

@@ -47,13 +47,16 @@ export class SubscriptionModel implements ISubscriptionModel {
     trx?: Knex,
   ): Promise<void> {
     await this.repositoryModel.upsert(repo, trx);
-    await (trx ?? this.db)('subscriptions').insert({
-      email,
-      repo,
-      confirm_token: confirmToken,
-      unsubscribe_token: unsubscribeToken,
-      status: 'pending',
-    });
+    await (trx ?? this.db)('subscriptions')
+      .insert({
+        email,
+        repo,
+        confirm_token: confirmToken,
+        unsubscribe_token: unsubscribeToken,
+        status: 'pending',
+      })
+      .onConflict(['email', 'repo'])
+      .merge(['confirm_token', 'unsubscribe_token']);
   }
 
   // Returns true only when a CONFIRMED subscription exists. A still-pending row is
