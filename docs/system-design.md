@@ -22,25 +22,27 @@
 
 The system is composed of two runtime services that communicate via a RabbitMQ message broker:
 
-- **`app`** — the main API server and scanner. Handles subscriptions, confirms repositories via GitHub API, persists data, and detects new releases.
-- **`notification`** — a standalone microservice that consumes `email.requested` events from RabbitMQ and delivers emails via SMTP.
+- **`app`** — the main API server, scanner, and **Saga orchestrator**. Handles subscriptions, confirms repositories via GitHub API, persists data, detects new releases, and drives the subscribe→email-delivered distributed transaction.
+- **`notification`** — a standalone microservice (with its **own PostgreSQL database**) that consumes `email.requested` commands, delivers emails via SMTP, and publishes `email.sent` / `email.failed` saga reply events back to `app`.
 
 ```mermaid
 flowchart TD
-    subgraph Sub["Subscription Flow (on demand)"]
+    subgraph Sub["Subscription Saga (on demand)"]
         A[User] -->|POST /api/subscribe| B[Repository validation\nGitHub API]
-        B --> C[Persist subscription + outbox event\natomic DB transaction]
+        B --> C[Persist subscription + saga + outbox event\natomic DB transaction]
         C --> D[Outbox relay → RabbitMQ]
-        D --> E[Notification service sends confirmation email]
-        E --> F[User confirms subscription]
+        D --> E{Notification service\nsends confirmation email}
+        E -->|success| F[Publish email.sent\napp marks saga completed]
+        E -->|retries exhausted| G[Publish email.failed\napp deletes pending subscription\nSaga compensated]
+        F --> H[User confirms subscription]
     end
 
     subgraph Scan["Scanner Flow (scheduled, every hour)"]
-        G["[cron] Scheduler"] --> H[Fetch all confirmed subscriptions]
-        H --> I[GitHub API — check latest release]
-        I -->|new release detected| J[Publish email.requested to RabbitMQ]
-        J --> K[Notification service sends release email]
-        I -->|no new release| L[Skip]
+        I["[cron] Scheduler"] --> J[Fetch all confirmed subscriptions]
+        J --> K[GitHub API — check latest release]
+        K -->|new release detected| L[Publish email.requested to RabbitMQ]
+        L --> M[Notification service sends release email]
+        K -->|no new release| N[Skip]
     end
 ```
 
@@ -151,7 +153,8 @@ flowchart TB
         Caddy["Caddy (TLS)\n:80 / :443"]
         App["Node.js App\n(app service)"]
         Notification["Node.js\n(notification service)"]
-        PG[("PostgreSQL 16")]
+        PG[("PostgreSQL 16\napp DB")]
+        NotifPG[("PostgreSQL 16\nnotification DB")]
         RabbitMQ[("RabbitMQ 3.13")]
         Filebeat["Filebeat"]
         ES[("Elasticsearch")]
@@ -161,8 +164,11 @@ flowchart TB
         Caddy <-->|":5601"| Kibana
         Caddy <-->|":3000/grafana"| Grafana["Grafana\n(/grafana)"]
         App --> PG
+        Notification --> NotifPG
         App -->|"email.requested"| RabbitMQ
+        Notification -->|"email.sent / email.failed"| RabbitMQ
         Notification -->|"consume email.requested"| RabbitMQ
+        App -->|"consume email.sent / email.failed"| RabbitMQ
         Filebeat -->|"JSON logs"| ES
         Kibana --> ES
         ESInit -->|"PUT /_index_template"| ES
@@ -177,7 +183,7 @@ flowchart TB
     Docker -->|"container logs"| Filebeat
 ```
 
-### Subscription Flow (Happy Path)
+### Subscription Saga — Happy Path
 
 ```mermaid
 sequenceDiagram
@@ -185,30 +191,67 @@ sequenceDiagram
     participant Express
     participant SubscriptionService
     participant GitHubAPI as GitHub API
-    participant DB
-    participant OutboxRelay
+    participant AppDB as App DB
+    participant OutboxRelay as App OutboxRelay
     participant RabbitMQ
     participant NotificationService
+    participant NotifDB as Notification DB
+    participant NotifRelay as Notification OutboxRelay
     participant SMTP
+    participant Orchestrator as SagaOrchestrator
 
     Client->>Express: POST /subscribe
     Express->>SubscriptionService: subscribe(email, repo)
     SubscriptionService->>GitHubAPI: GET /repos/{repo}
     GitHubAPI-->>SubscriptionService: 200 OK
-    SubscriptionService->>DB: INSERT subscription + outbox event (atomic)
+    SubscriptionService->>AppDB: INSERT subscription + saga_row + outbox event (atomic)
     Express-->>Client: 200 OK
 
     Note over OutboxRelay: polls every 1 s
-    OutboxRelay->>DB: SELECT unpublished (FOR UPDATE SKIP LOCKED)
-    OutboxRelay->>RabbitMQ: publish email.requested
-    OutboxRelay->>DB: mark published
-    RabbitMQ-->>NotificationService: email.requested
-    NotificationService->>SMTP: sendConfirmEmail
+    OutboxRelay->>AppDB: SELECT unpublished (FOR UPDATE SKIP LOCKED)
+    OutboxRelay->>RabbitMQ: publish email.requested {saga_id}
+    OutboxRelay->>AppDB: mark published
+    RabbitMQ-->>NotificationService: email.requested {saga_id}
+
+    NotificationService->>NotifDB: inbox.wasProcessed(saga_id)?
+    NotifDB-->>NotificationService: false
+    NotificationService->>SMTP: sendConfirmationEmail
+    SMTP-->>NotificationService: sent
+    NotificationService->>NotifDB: INSERT inbox + outbox{email.sent} (atomic)
+
+    Note over NotifRelay: polls every 1 s
+    NotifRelay->>NotifDB: SELECT unpublished
+    NotifRelay->>RabbitMQ: publish email.sent {saga_id}
+    NotifRelay->>NotifDB: mark published
+    RabbitMQ-->>Orchestrator: email.sent {saga_id}
+    Orchestrator->>AppDB: UPDATE saga status=completed
 
     Client->>Express: GET /confirm/:token
     Express->>SubscriptionService: confirm(token)
-    SubscriptionService->>DB: UPDATE status=confirmed
+    SubscriptionService->>AppDB: UPDATE status=confirmed
     Express-->>Client: 200 OK
+```
+
+### Subscription Saga — Compensation Path (email permanently failed)
+
+```mermaid
+sequenceDiagram
+    participant NotificationService
+    participant NotifDB as Notification DB
+    participant SMTP
+    participant RabbitMQ
+    participant Orchestrator as SagaOrchestrator
+    participant AppDB as App DB
+
+    Note over NotificationService: retries exhausted after N attempts
+    NotificationService->>SMTP: sendConfirmationEmail (attempt N)
+    SMTP-->>NotificationService: Error
+    NotificationService->>NotifDB: INSERT inbox{failed} + outbox{email.failed} (atomic)
+
+    NotifDB-->>RabbitMQ: email.failed {saga_id, reason} (via outbox relay)
+    RabbitMQ-->>Orchestrator: email.failed {saga_id}
+    Orchestrator->>AppDB: DELETE subscription + UPDATE saga status=compensated (atomic)
+    Note over AppDB: Pending subscription removed.\nUser can re-subscribe.
 ```
 
 ### Scanner Flow (Release Notification)
@@ -268,12 +311,26 @@ Coordinates the full subscription lifecycle:
 
 | Method                    | Action                                                                                                                          |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `subscribe(email, repo)`  | Validates repo → checks for duplicate → generates tokens (`crypto.randomBytes(32)`) → persists subscription + outbox event in one DB transaction |
+| `subscribe(email, repo)`  | Validates repo → checks for duplicate → generates tokens (`crypto.randomBytes(32)`) → persists subscription + saga row + `email.requested` outbox event atomically |
 | `confirm(token)`          | Validates token format (hex 64) → updates status to `confirmed`                                                                 |
 | `unsubscribe(token)`      | Validates format → deletes the subscription row                                                                                 |
 | `getSubscriptions(email)` | Returns all subscriptions for the given email                                                                                   |
 
-**Key detail:** the subscription row and the `email.requested` outbox event are written in a single transaction. The outbox relay later publishes the event to RabbitMQ, decoupling the HTTP response from broker availability and preventing lost confirmation emails even if the broker is temporarily down.
+**Key detail:** the subscription row, the `subscription_sagas` row (saga state), and the `email.requested` outbox event are all written in a **single transaction**. The `saga_id` (the generated uuid for the saga row) flows as a correlation id through the command and back in the reply. The outbox relay later publishes the event to RabbitMQ, decoupling the HTTP response from broker availability.
+
+### 6.8 Saga Orchestrator
+
+The `SubscriptionSagaOrchestrator` and `SagaReplyConsumer` implement the orchestrated Saga for the subscribe→email-delivered distributed transaction.
+
+| Component               | Role                                                                                    |
+| ----------------------- | --------------------------------------------------------------------------------------- |
+| `SagaReplyConsumer`     | Subscribes to `email.sent` and `email.failed` reply events from the notification service |
+| `SubscriptionSagaOrchestrator` | On `email.sent`: marks saga `completed`. On `email.failed`: deletes the pending subscription and marks saga `compensated` |
+| `SubscriptionSagaModel` | CRUD for the `subscription_sagas` table                                                 |
+
+**Idempotency:** all orchestrator operations check the current saga status before acting. If the saga is already in a terminal state (`completed` or `compensated`) the handler is a no-op, making at-least-once redelivery of reply events safe.
+
+**Compensation semantics:** deleting the pending subscription on `email.failed` restores the pre-saga state — the `(email, repo)` unique slot is freed so the user can re-subscribe.
 
 ### 6.3 Scanner Service
 
@@ -326,14 +383,24 @@ Without `GITHUB_TOKEN` — 60 req/hour; with token — 5,000 req/hour.
 
 ### 6.7 Notification Service
 
-Standalone Node.js process (`services/notification`). Responsibilities:
+Standalone Node.js process (`services/notification`) with **its own PostgreSQL database**. Responsibilities:
 
 | Component               | Role                                                                                  |
 | ----------------------- | ------------------------------------------------------------------------------------- |
-| `EmailRequestedConsumer`| Subscribes to `email.requested` on RabbitMQ; dispatches to email sender              |
+| `EmailRequestedConsumer`| Subscribes to `email.requested` on RabbitMQ; dispatches to email sender; publishes saga replies via outbox |
 | `RetryingEmailSender`   | Wraps Nodemailer; retries transient SMTP failures with exponential backoff            |
 | `EmailTemplateBuilder`  | Renders confirmation and notification email HTML                                      |
+| `InboxModel`            | Deduplicates message processing by `saga_id` (exactly-once for confirmation emails)  |
+| `OutboxModel` / `OutboxRelay` | Reliably publishes `email.sent` / `email.failed` replies to RabbitMQ            |
 | Health server           | Minimal HTTP server on `:3002` — returns `{"status":"ok"}` for Docker health checks  |
+
+**Confirmation email flow (Saga participant):**
+1. Check `inbox.wasProcessed(saga_id)` — skip entirely on redelivery (idempotent).
+2. Attempt `sendConfirmationEmail` via `RetryingEmailSender`.
+3. **Success:** atomically insert `inbox{sent}` + enqueue `email.sent` in outbox.
+4. **Permanent failure (retries exhausted):** atomically insert `inbox{failed}` + enqueue `email.failed` in outbox (handler returns normally; no nack — failure is handled via reply).
+
+**Release notification emails** (`type: 'notification'`) remain fire-and-forget — no Saga, no reply, nack on failure.
 
 Email types:
 
@@ -364,6 +431,7 @@ OUTBOX_BATCH_SIZE         → optional (default: 50)
 **`notification` service** — fail-fast validation on startup:
 
 ```
+DATABASE_URL              → required (notification service's own PostgreSQL)
 RABBITMQ_URL              → optional (default: amqp://localhost:5672)
 SMTP_HOST                 → required
 SMTP_PORT                 → optional (default: 587)
@@ -374,13 +442,15 @@ BASE_URL                  → optional (default: http://localhost:3000)
 EMAIL_RETRY_ATTEMPTS      → optional (default: 3)
 EMAIL_RETRY_BACKOFF_MS    → optional (default: 500)
 HEALTH_PORT               → optional (default: 3002)
+OUTBOX_POLL_INTERVAL_MS   → optional (default: 1000)
+OUTBOX_BATCH_SIZE         → optional (default: 50)
 ```
 
 ---
 
 ## 7. Data Model
 
-### Database Schema
+### App Service Database Schema
 
 ```sql
 -- Tracked repositories
@@ -401,20 +471,52 @@ CREATE TABLE subscriptions (
   UNIQUE (email, repo)
 );
 
--- Transactional outbox for broker events
+-- Transactional outbox for broker events (email.requested commands)
 CREATE TABLE outbox (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  routing_key TEXT        NOT NULL,
-  payload     JSONB       NOT NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  routing_key  TEXT        NOT NULL,
+  payload      JSONB       NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   published_at TIMESTAMPTZ,                   -- NULL = not yet published
-  attempts    INTEGER     NOT NULL DEFAULT 0
+  attempts     INTEGER     NOT NULL DEFAULT 0
 );
--- Index used by the relay to find unpublished rows oldest-first
 CREATE INDEX outbox_unpublished_idx ON outbox (published_at, created_at);
+
+-- Saga state table: one row per subscribe→email-delivered transaction
+CREATE TABLE subscription_sagas (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),  -- also serves as saga_id / correlation id
+  subscription_id UUID NOT NULL,       -- no FK: outlives the subscription row during compensation
+  type            TEXT NOT NULL DEFAULT 'subscribe',
+  status          TEXT NOT NULL DEFAULT 'started',  -- 'started' | 'completed' | 'compensated'
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX subscription_sagas_status_idx ON subscription_sagas (status);
 ```
 
-### ER Diagram
+### Notification Service Database Schema (separate PostgreSQL instance)
+
+```sql
+-- Transactional outbox for saga reply events (email.sent / email.failed)
+CREATE TABLE outbox (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  routing_key  TEXT        NOT NULL,
+  payload      JSONB       NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  published_at TIMESTAMPTZ,
+  attempts     INTEGER     NOT NULL DEFAULT 0
+);
+CREATE INDEX outbox_unpublished_idx ON outbox (published_at, created_at);
+
+-- Inbox deduplication: prevents duplicate emails on at-least-once redelivery
+CREATE TABLE inbox (
+  id           TEXT PRIMARY KEY,        -- saga_id (natural dedup key)
+  status       TEXT NOT NULL,           -- 'sent' | 'failed'
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+### App Service ER Diagram
 
 ```mermaid
 erDiagram
@@ -438,22 +540,38 @@ erDiagram
         TIMESTAMPTZ published_at
         INTEGER attempts
     }
+    subscription_sagas {
+        UUID id PK
+        UUID subscription_id
+        TEXT type
+        TEXT status
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
     repositories ||--o{ subscriptions : "has"
 ```
 
 ### Migrations
 
-Managed via Knex migrations (`src/platform/db/migrations/`). Applied automatically on container start via `docker-entrypoint.sh`:
+**App service** — managed via Knex migrations (`src/platform/db/migrations/`), applied on container start via `docker-entrypoint.sh`:
 
 ```sh
 node dist/migrate.js   # knex migrate:latest
 node dist/index.js     # start the service
 ```
 
-| Migration file                                    | Change                                          |
-| ------------------------------------------------- | ----------------------------------------------- |
-| `001_create_repositories_and_subscriptions.ts`    | Creates `repositories` and `subscriptions` tables |
-| `002_create_outbox.ts`                            | Creates `outbox` table with relay index         |
+| Migration file                                    | Change                                              |
+| ------------------------------------------------- | --------------------------------------------------- |
+| `001_create_repositories_and_subscriptions.ts`    | Creates `repositories` and `subscriptions` tables   |
+| `002_create_outbox.ts`                            | Creates `outbox` table with relay index             |
+| `003_create_subscription_sagas.ts`                | Creates `subscription_sagas` saga-state table       |
+
+**Notification service** — managed via Knex migrations (`services/notification/src/db/migrations/`), applied on container start via `services/notification/docker-entrypoint.sh`:
+
+| Migration file             | Change                                                                              |
+| -------------------------- | ----------------------------------------------------------------------------------- |
+| `001_create_outbox.ts`     | Creates `outbox` table for saga reply events                                        |
+| `002_create_inbox.ts`      | Creates `inbox` table for idempotent exactly-once processing of confirmation emails |
 
 ---
 
@@ -574,6 +692,12 @@ When the rate limit is exceeded (status 429), the service throws `GitHubRateLimi
 
 **Exchange:** `release-owl.events` (topic, durable)
 
+| Routing key     | Producer                    | Consumer           | Queue                   | Purpose                        |
+| --------------- | --------------------------- | ------------------ | ----------------------- | ------------------------------ |
+| `email.requested` | `app` outbox relay (confirmation) / scanner (notification) | `notification` | `notification.email-requested` | Command: send email |
+| `email.sent`    | `notification` outbox relay | `app` saga orchestrator | `app.email-sent`   | Saga reply: email delivered    |
+| `email.failed`  | `notification` outbox relay | `app` saga orchestrator | `app.email-failed` | Saga reply: email permanently failed |
+
 #### `email.requested`
 
 Published by the `app` service (via outbox relay for confirmations; directly for release notifications). Consumed by the `notification` service from queue `notification.email-requested` (durable).
@@ -581,15 +705,16 @@ Published by the `app` service (via outbox relay for confirmations; directly for
 **Payload** (discriminated union on `type`):
 
 ```typescript
-// Confirmation email
+// Confirmation email — carries saga_id for correlation
 {
   type: "confirmation",
   email: string,
   repo: string,
-  confirm_token: string
+  confirm_token: string,
+  saga_id: string  // UUID — correlation id for the Saga reply
 }
 
-// Release notification email
+// Release notification email (fire-and-forget, no saga)
 {
   type: "notification",
   email: string,
@@ -597,6 +722,22 @@ Published by the `app` service (via outbox relay for confirmations; directly for
   tag_name: string,
   unsubscribe_token: string
 }
+```
+
+#### `email.sent`
+
+Published by the `notification` service via its outbox relay after successfully delivering a confirmation email. Consumed by `app`'s `SagaReplyConsumer` from queue `app.email-sent`.
+
+```typescript
+{ saga_id: string, repo: string }
+```
+
+#### `email.failed`
+
+Published by the `notification` service via its outbox relay after all SMTP retries are exhausted for a confirmation email. Consumed by `app`'s `SagaReplyConsumer` from queue `app.email-failed`.
+
+```typescript
+{ saga_id: string, repo: string, reason: string }
 ```
 
 Contracts are defined in the shared `@release-owl/contracts` package (`packages/contracts`).
@@ -691,16 +832,18 @@ The project uses **Jest** as the test runner with **Supertest** for HTTP-layer i
 
 | File                                                    | What is tested                                                             |
 | ------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `src/modules/subscriptions/__tests__/subscription.service.test.ts`  | Subscribe, confirm, unsubscribe, duplicate detection, outbox enqueue       |
+| `src/modules/subscriptions/__tests__/subscription.service.test.ts`  | Subscribe (with saga), confirm, unsubscribe, duplicate detection, outbox enqueue |
+| `src/modules/sagas/__tests__/subscription-saga.orchestrator.test.ts` | `onEmailSent` → completed; `onEmailFailed` → delete subscription + compensated; idempotency |
+| `src/modules/sagas/__tests__/saga-reply.consumer.test.ts`           | Routes `email.sent` / `email.failed` to orchestrator; schema validation   |
 | `src/modules/releases/__tests__/scanner.service.test.ts`            | Scan cycle: grouping by repo, new release detection, notification dispatch |
 | `src/modules/releases/__tests__/release.handler.test.ts`            | Release handling, `Promise.allSettled` failure isolation, tag update       |
 | `src/modules/github/__tests__/github.service.test.ts`               | Repository existence check, latest release fetch, rate limit handling      |
 | `src/modules/notifications/__tests__/broker-notifier.test.ts`       | Broker publish calls for confirmation and notification events              |
 | `src/modules/outbox/__tests__/outbox.relay.test.ts`                 | Outbox drain batching, at-least-once publish, concurrent drain skip        |
-| `src/modules/subscriptions/__tests__/subscription.controller.test.ts`| Request validation, error mapping to HTTP status codes                    |
+| `src/modules/subscriptions/__tests__/subscription.controller.test.ts`| Request validation, error mapping to HTTP status codes                   |
 | `src/platform/http/__tests__/api-key-auth.test.ts`                  | Timing-safe API key comparison, missing/invalid key rejection              |
 | `packages/platform/src/broker/__tests__/rabbitmq.broker.test.ts`    | RabbitMQ publish, subscribe, reconnect, dead-letter on handler failure     |
-| `services/notification/src/__tests__/email-requested.consumer.test.ts` | Consumer dispatch for confirmation/notification types                   |
+| `services/notification/src/__tests__/email-requested.consumer.test.ts` | Saga path: `email.sent` on success; `email.failed` on exhaustion; inbox idempotency; fire-and-forget notification unchanged |
 | `services/notification/src/__tests__/retrying-email.sender.test.ts` | Retry logic with exponential backoff, exhaustion behaviour                 |
 
 **Integration tests** (`tests/integration/subscription.test.ts`) spin up the full Express application and verify end-to-end HTTP flows: subscribe → confirm → receive notification → unsubscribe. All external dependencies (broker, SMTP) are replaced with in-memory fakes, so the full suite runs without any external services.
