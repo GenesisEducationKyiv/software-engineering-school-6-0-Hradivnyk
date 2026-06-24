@@ -4,6 +4,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
+COPY packages ./packages
+COPY services/notification/package.json ./services/notification/
 COPY .husky/install.mjs ./.husky/install.mjs
 COPY packages/contracts/package.json ./packages/contracts/
 COPY packages/platform/package.json ./packages/platform/
@@ -22,6 +24,8 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 COPY package*.json ./
+COPY packages ./packages
+COPY services/notification/package.json ./services/notification/
 COPY .husky/install.mjs ./.husky/install.mjs
 COPY packages/contracts/package.json ./packages/contracts/
 COPY packages/platform/package.json ./packages/platform/

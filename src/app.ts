@@ -22,6 +22,10 @@ const app = express();
 
 app.use(express.static(resolve(process.cwd(), 'public')));
 
+app.get('/health', (_req, res) => {
+  res.sendStatus(200);
+});
+
 app.use(metricsMiddleware);
 
 app.get('/metrics', (_req, res) => {
