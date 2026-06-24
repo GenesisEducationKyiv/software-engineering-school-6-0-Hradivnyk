@@ -52,7 +52,7 @@ function fakeUow(): jest.Mocked<IUnitOfWork> & { run: jest.Mock } {
   return {
     run: jest.fn(async (work: (trx: Knex.Transaction) => Promise<unknown>) =>
       work(fakeTrx),
-    ),
+    ) as jest.Mock,
   };
 }
 

@@ -55,6 +55,7 @@ describe('SubscriptionService', () => {
     mockSagaModel = {
       start: jest.fn(),
       findById: jest.fn(),
+      findStartedOlderThan: jest.fn(),
       markCompleted: jest.fn(),
       markCompensated: jest.fn(),
     };
