@@ -30,6 +30,7 @@ describe('SubscriptionService', () => {
   beforeEach(() => {
     mockModel = {
       create: jest.fn(),
+      updatePendingSubscription: jest.fn(),
       hasConfirmedSubscription: jest.fn(),
       confirm: jest.fn(),
       deleteByUnsubscribeToken: jest.fn(),
@@ -72,6 +73,7 @@ describe('SubscriptionService', () => {
     beforeEach(() => {
       mockGithubService.repositoryExists.mockResolvedValue(true);
       mockModel.hasConfirmedSubscription.mockResolvedValue(false);
+      mockModel.updatePendingSubscription.mockResolvedValue(null);
       mockModel.create.mockResolvedValue(FAKE_SUBSCRIPTION_ID);
       mockSagaModel.start.mockResolvedValue(FAKE_SAGA_ID);
       mockOutbox.enqueue.mockResolvedValue(undefined);

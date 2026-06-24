@@ -12,6 +12,7 @@
 8. [Future Work](#8-future-work)
 
 **Detailed docs:**
+
 - [Orchestrated Saga](saga.md) — sequence diagrams, compensation, idempotency
 - [Data Model](data-model.md) — schemas, ER diagram, migrations
 - [Observability](observability.md) — logging, metrics, alerting
@@ -55,19 +56,19 @@ flowchart TD
 
 ### Functional
 
-| # | Requirement |
-| - | ----------- |
-| F-01 | Subscribe by email + `owner/repo` |
-| F-02 | Validate repository via GitHub REST API before persisting |
+| #    | Requirement                                                      |
+| ---- | ---------------------------------------------------------------- |
+| F-01 | Subscribe by email + `owner/repo`                                |
+| F-02 | Validate repository via GitHub REST API before persisting        |
 | F-03 | Double opt-in: subscription active only after email confirmation |
-| F-04 | Confirmation email sent after subscribe (via Saga) |
-| F-05 | Email notifications to all confirmed subscribers on new release |
-| F-06 | Each notification email contains an unsubscribe link |
-| F-07 | Unsubscribe at any time via token link |
-| F-08 | API to list subscriptions for an email |
-| F-09 | `(email, repo)` unique — duplicate returns 409 |
-| F-10 | Static landing page for subscribe without API |
-| F-11 | Swagger UI at `/api/docs` |
+| F-04 | Confirmation email sent after subscribe (via Saga)               |
+| F-05 | Email notifications to all confirmed subscribers on new release  |
+| F-06 | Each notification email contains an unsubscribe link             |
+| F-07 | Unsubscribe at any time via token link                           |
+| F-08 | API to list subscriptions for an email                           |
+| F-09 | `(email, repo)` unique — duplicate returns 409                   |
+| F-10 | Static landing page for subscribe without API                    |
+| F-11 | Swagger UI at `/api/docs`                                        |
 
 ### Non-Functional
 
@@ -76,7 +77,7 @@ flowchart TD
 | **Availability**    | Service uptime                       | ≥ 99% (single-instance EC2)                                        |
 | **Scalability**     | Number of monitored repositories     | Up to 1,000 without architectural changes                          |
 | **Reliability**     | Confirmation email delivery          | Transactional outbox guarantees at-least-once delivery to broker   |
-| **Reliability**     | Consistency (pending subscription)   | Orchestrated Saga: compensates on permanent email failure           |
+| **Reliability**     | Consistency (pending subscription)   | Orchestrated Saga: compensates on permanent email failure          |
 | **Reliability**     | SMTP transient failures              | Notification service retries with exponential backoff (3 attempts) |
 | **Reliability**     | Single email send failure            | Does not stop processing other subscribers (`Promise.allSettled`)  |
 | **Reliability**     | Scanner crash                        | Does not affect HTTP request handling (graceful logging)           |
@@ -206,6 +207,7 @@ sequenceDiagram
 ### 5.1 HTTP Server (Express 5)
 
 Middleware pipeline (in order):
+
 ```
 express.static(public/)   → landing page
 helmet()                  → security headers
@@ -222,12 +224,12 @@ Errors: `ZodError` → 400; custom `AppError` subclasses → their HTTP codes; u
 
 ### 5.2 Subscription Service
 
-| Method | Action |
-| ------ | ------ |
-| `subscribe(email, repo)` | Validate repo → check duplicate → atomically INSERT subscription + saga row + outbox event |
-| `confirm(token)` | Validate format → UPDATE status=confirmed |
-| `unsubscribe(token)` | Validate format → DELETE subscription |
-| `getSubscriptions(email)` | Return all confirmed subscriptions |
+| Method                    | Action                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------ |
+| `subscribe(email, repo)`  | Validate repo → check duplicate → atomically INSERT subscription + saga row + outbox event |
+| `confirm(token)`          | Validate format → UPDATE status=confirmed                                                  |
+| `unsubscribe(token)`      | Validate format → DELETE subscription                                                      |
+| `getSubscriptions(email)` | Return all confirmed subscriptions                                                         |
 
 The three writes in `subscribe` share one transaction — subscription, saga state, and the email command commit or roll back together.
 
@@ -240,23 +242,23 @@ The three writes in `subscribe` share one transaction — subscription, saga sta
 
 See [saga.md](saga.md) for full detail and sequence diagrams.
 
-| Component | Role |
-| --------- | ---- |
-| `SagaReplyConsumer` | Subscribes to `email.sent` / `email.failed` reply queues |
+| Component                      | Role                                                                                   |
+| ------------------------------ | -------------------------------------------------------------------------------------- |
+| `SagaReplyConsumer`            | Subscribes to `email.sent` / `email.failed` reply queues                               |
 | `SubscriptionSagaOrchestrator` | `email.sent` → mark completed; `email.failed` → delete subscription + mark compensated |
-| `SubscriptionSagaModel` | CRUD on `subscription_sagas` |
+| `SubscriptionSagaModel`        | CRUD on `subscription_sagas`                                                           |
 
 ### 5.4 Notification Service
 
 See [saga.md](saga.md) for the participant flow.
 
-| Component | Role |
-| --------- | ---- |
-| `EmailRequestedConsumer` | Consumes `email.requested`; saga participant for `confirmation` type |
-| `InboxModel` | Deduplicates by `saga_id` — exactly-once send per command |
-| `OutboxModel` / `OutboxRelay` | Reliably publishes `email.sent` / `email.failed` replies |
-| `RetryingEmailSender` | Exponential backoff (default 3 attempts, 500 ms initial) |
-| `EmailTemplateBuilder` | Renders confirmation and notification email text |
+| Component                     | Role                                                                 |
+| ----------------------------- | -------------------------------------------------------------------- |
+| `EmailRequestedConsumer`      | Consumes `email.requested`; saga participant for `confirmation` type |
+| `InboxModel`                  | Deduplicates by `saga_id` — exactly-once send per command            |
+| `OutboxModel` / `OutboxRelay` | Reliably publishes `email.sent` / `email.failed` replies             |
+| `RetryingEmailSender`         | Exponential backoff (default 3 attempts, 500 ms initial)             |
+| `EmailTemplateBuilder`        | Renders confirmation and notification email text                     |
 
 Release notification emails (`type: 'notification'`) remain fire-and-forget — no saga, no reply.
 
@@ -267,6 +269,7 @@ Polls every `OUTBOX_POLL_INTERVAL_MS` (default 1 000 ms). Claims rows with `SELE
 ### 5.6 Scanner Service
 
 Cron job (`SCANNER_CRON_SCHEDULE`, default `0 * * * *`):
+
 1. Load all confirmed subscriptions with `last_seen_tag`.
 2. Group by `repo` → 1 GitHub API call per repo.
 3. Compare `release.tag_name` vs `last_seen_tag`.
@@ -277,10 +280,10 @@ Cron job (`SCANNER_CRON_SCHEDULE`, default `0 * * * *`):
 | ----------------- | ------------------------------ | ---------------------- | ------------------------------ |
 | `email.requested` | `app` (outbox relay / scanner) | `notification` service | `notification.email-requested` |
 
-| Method | Endpoint | Behavior |
-| ------ | -------- | -------- |
-| `repositoryExists(repo)` | `GET /repos/{owner}/{repo}` | 200 → true, 404 → false, 429/403 → throw `GitHubRateLimitError` |
-| `getLatestRelease(repo)` | `GET /repos/{owner}/{repo}/releases/latest` | 200 → `{tag_name}`, 404 → null, 429/403 → throw |
+| Method                   | Endpoint                                    | Behavior                                                        |
+| ------------------------ | ------------------------------------------- | --------------------------------------------------------------- |
+| `repositoryExists(repo)` | `GET /repos/{owner}/{repo}`                 | 200 → true, 404 → false, 429/403 → throw `GitHubRateLimitError` |
+| `getLatestRelease(repo)` | `GET /repos/{owner}/{repo}/releases/latest` | 200 → `{tag_name}`, 404 → null, 429/403 → throw                 |
 
 `Retry-After` header takes priority over `X-RateLimit-Reset` for rate-limit reset time.
 
@@ -324,6 +327,7 @@ SMTP retry policy: up to `EMAIL_RETRY_ATTEMPTS` (default: 3) attempts with initi
 **`app` service** — fail-fast validation on startup:
 
 **`app` service:**
+
 ```
 DATABASE_URL            required
 API_KEY                 required
@@ -337,6 +341,7 @@ OUTBOX_BATCH_SIZE       optional  (default: 50)
 ```
 
 **`notification` service:**
+
 ```
 DATABASE_URL            required  (own PostgreSQL)
 SMTP_HOST               required
@@ -359,36 +364,37 @@ OUTBOX_BATCH_SIZE       optional  (default: 50)
 
 Exchange: `release-owl.events` (topic, durable). All messages persistent.
 
-| Routing key | Producer | Consumer | Queue |
-| ----------- | -------- | -------- | ----- |
-| `email.requested` | `app` outbox relay / scanner | `notification` | `notification.email-requested` |
-| `email.sent` | `notification` outbox relay | `app` orchestrator | `app.email-sent` |
-| `email.failed` | `notification` outbox relay | `app` orchestrator | `app.email-failed` |
+| Routing key       | Producer                     | Consumer           | Queue                          |
+| ----------------- | ---------------------------- | ------------------ | ------------------------------ |
+| `email.requested` | `app` outbox relay / scanner | `notification`     | `notification.email-requested` |
+| `email.sent`      | `notification` outbox relay  | `app` orchestrator | `app.email-sent`               |
+| `email.failed`    | `notification` outbox relay  | `app` orchestrator | `app.email-failed`             |
 
 -- User subscriptions
 CREATE TABLE subscriptions (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email             TEXT NOT NULL,
-  repo              TEXT NOT NULL REFERENCES repositories(repo) ON DELETE CASCADE,
-  confirm_token     TEXT NOT NULL UNIQUE,      -- hex 64 chars, crypto.randomBytes(32)
-  unsubscribe_token TEXT NOT NULL UNIQUE,      -- hex 64 chars, crypto.randomBytes(32)
-  status            TEXT NOT NULL DEFAULT 'pending',  -- 'pending' | 'confirmed'
+id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+email TEXT NOT NULL,
+repo TEXT NOT NULL REFERENCES repositories(repo) ON DELETE CASCADE,
+confirm_token TEXT NOT NULL UNIQUE, -- hex 64 chars, crypto.randomBytes(32)
+unsubscribe_token TEXT NOT NULL UNIQUE, -- hex 64 chars, crypto.randomBytes(32)
+status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'confirmed'
 
-  UNIQUE (email, repo)
+UNIQUE (email, repo)
 );
 
 -- Transactional outbox for broker events
 CREATE TABLE outbox (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  routing_key TEXT        NOT NULL,
-  payload     JSONB       NOT NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  published_at TIMESTAMPTZ,                   -- NULL = not yet published
-  attempts    INTEGER     NOT NULL DEFAULT 0
+id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+routing_key TEXT NOT NULL,
+payload JSONB NOT NULL,
+created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+published_at TIMESTAMPTZ, -- NULL = not yet published
+attempts INTEGER NOT NULL DEFAULT 0
 );
 -- Index used by the relay to find unpublished rows oldest-first
 CREATE INDEX outbox_unpublished_idx ON outbox (published_at, created_at);
-```
+
+````
 
 ### ER Diagram
 
@@ -415,7 +421,7 @@ erDiagram
         INTEGER attempts
     }
     repositories ||--o{ subscriptions : "has"
-```
+````
 
 ### Migrations
 
@@ -574,26 +580,26 @@ Published by the `app` service (via outbox relay for confirmations; directly for
 
 ### Test Layers
 
-| Layer | Tool | Scope |
-| ----- | ---- | ----- |
-| Unit | Jest | Business logic in isolation (mocked DB, broker, SMTP) |
-| Integration | Jest + Supertest | Full HTTP cycle against real test DB |
-| E2E | Playwright + Mailhog | Browser → subscribe → confirm email in MailHog |
+| Layer       | Tool                 | Scope                                                 |
+| ----------- | -------------------- | ----------------------------------------------------- |
+| Unit        | Jest                 | Business logic in isolation (mocked DB, broker, SMTP) |
+| Integration | Jest + Supertest     | Full HTTP cycle against real test DB                  |
+| E2E         | Playwright + Mailhog | Browser → subscribe → confirm email in MailHog        |
 
 ### Unit Test Files
 
-| File | What is tested |
-| ---- | -------------- |
-| `src/modules/subscriptions/__tests__/subscription.service.test.ts` | subscribe (with saga), confirm, unsubscribe, duplicate detection |
-| `src/modules/sagas/__tests__/subscription-saga.orchestrator.test.ts` | `onEmailSent` → completed; `onEmailFailed` → delete + compensated; idempotency |
-| `src/modules/sagas/__tests__/saga-reply.consumer.test.ts` | Routes `email.sent` / `email.failed` to orchestrator |
-| `src/modules/releases/__tests__/scanner.service.test.ts` | Scan cycle, release detection, notification dispatch |
-| `src/modules/releases/__tests__/release.handler.test.ts` | `Promise.allSettled` failure isolation, tag update |
-| `src/modules/github/__tests__/github.service.test.ts` | Repo check, release fetch, rate-limit handling |
-| `src/modules/outbox/__tests__/outbox.relay.test.ts` | Drain batching, at-least-once publish |
-| `packages/platform/src/broker/__tests__/rabbitmq.broker.test.ts` | Publish, subscribe, reconnect, dead-letter on failure |
+| File                                                                   | What is tested                                                                  |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `src/modules/subscriptions/__tests__/subscription.service.test.ts`     | subscribe (with saga), confirm, unsubscribe, duplicate detection                |
+| `src/modules/sagas/__tests__/subscription-saga.orchestrator.test.ts`   | `onEmailSent` → completed; `onEmailFailed` → delete + compensated; idempotency  |
+| `src/modules/sagas/__tests__/saga-reply.consumer.test.ts`              | Routes `email.sent` / `email.failed` to orchestrator                            |
+| `src/modules/releases/__tests__/scanner.service.test.ts`               | Scan cycle, release detection, notification dispatch                            |
+| `src/modules/releases/__tests__/release.handler.test.ts`               | `Promise.allSettled` failure isolation, tag update                              |
+| `src/modules/github/__tests__/github.service.test.ts`                  | Repo check, release fetch, rate-limit handling                                  |
+| `src/modules/outbox/__tests__/outbox.relay.test.ts`                    | Drain batching, at-least-once publish                                           |
+| `packages/platform/src/broker/__tests__/rabbitmq.broker.test.ts`       | Publish, subscribe, reconnect, dead-letter on failure                           |
 | `services/notification/src/__tests__/email-requested.consumer.test.ts` | Saga path: email.sent on success; email.failed on exhaustion; inbox idempotency |
-| `services/notification/src/__tests__/retrying-email.sender.test.ts` | Retry backoff, exhaustion |
+| `services/notification/src/__tests__/retrying-email.sender.test.ts`    | Retry backoff, exhaustion                                                       |
 
 **Log pipeline:**
 

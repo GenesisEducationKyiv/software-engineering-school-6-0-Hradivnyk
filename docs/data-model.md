@@ -82,11 +82,11 @@ erDiagram
 
 Applied automatically via `docker-entrypoint.sh` → `node dist/migrate.js`.
 
-| File | Change |
-| ---- | ------ |
+| File                                           | Change                          |
+| ---------------------------------------------- | ------------------------------- |
 | `001_create_repositories_and_subscriptions.ts` | `repositories`, `subscriptions` |
-| `002_create_outbox.ts` | `outbox` |
-| `003_create_subscription_sagas.ts` | `subscription_sagas` |
+| `002_create_outbox.ts`                         | `outbox`                        |
+| `003_create_subscription_sagas.ts`             | `subscription_sagas`            |
 
 ---
 
@@ -116,7 +116,7 @@ CREATE TABLE inbox (
 
 Applied via `services/notification/docker-entrypoint.sh` → `node services/notification/dist/migrate.js`.
 
-| File | Change |
-| ---- | ------ |
-| `001_create_outbox.ts` | `outbox` для reply-подій |
-| `002_create_inbox.ts` | `inbox` для ідемпотентної обробки |
+| File                   | Change                            |
+| ---------------------- | --------------------------------- |
+| `001_create_outbox.ts` | `outbox` для reply-подій          |
+| `002_create_inbox.ts`  | `inbox` для ідемпотентної обробки |

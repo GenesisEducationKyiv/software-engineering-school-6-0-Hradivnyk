@@ -20,6 +20,17 @@ export interface ISubscriptionModel {
     unsubscribeToken: string,
     trx?: Knex,
   ): Promise<string>;
+  /**
+   * Updates tokens on an existing pending subscription and returns its id,
+   * or returns null if no pending subscription exists for the given email+repo.
+   */
+  updatePendingSubscription(
+    email: string,
+    repo: string,
+    confirmToken: string,
+    unsubscribeToken: string,
+    trx?: Knex,
+  ): Promise<string | null>;
   hasConfirmedSubscription(email: string, repo: string): Promise<boolean>;
   confirm(
     confirmToken: string,
@@ -68,6 +79,23 @@ export class SubscriptionModel implements ISubscriptionModel {
   // be delivered after all retries.
   async deleteById(id: string, trx?: Knex): Promise<void> {
     await (trx ?? this.db)('subscriptions').where({ id }).delete();
+  }
+
+  async updatePendingSubscription(
+    email: string,
+    repo: string,
+    confirmToken: string,
+    unsubscribeToken: string,
+    trx?: Knex,
+  ): Promise<string | null> {
+    const rows: { id: string }[] = await (trx ?? this.db)('subscriptions')
+      .where({ email, repo, status: 'pending' })
+      .update({
+        confirm_token: confirmToken,
+        unsubscribe_token: unsubscribeToken,
+      })
+      .returning('id');
+    return rows[0]?.id ?? null;
   }
 
   // Returns true only when a CONFIRMED subscription exists. A still-pending row is

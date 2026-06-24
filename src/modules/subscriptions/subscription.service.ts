@@ -65,13 +65,25 @@ export class SubscriptionService implements ISubscriptionService {
     // saga row when it replies. saga_id flows through the email.requested command
     // and back in the email.sent / email.failed reply so the orchestrator can match.
     await this.unitOfWork.run(async (trx) => {
-      const subscriptionId = await this.subscriptionModel.create(
-        email,
-        repo,
-        confirmToken,
-        unsubscribeToken,
-        trx,
-      );
+      // Try updating an existing pending row first (re-subscribe while pending).
+      // Falls back to insert if no pending row exists yet.
+      let subscriptionId =
+        await this.subscriptionModel.updatePendingSubscription(
+          email,
+          repo,
+          confirmToken,
+          unsubscribeToken,
+          trx,
+        );
+      if (subscriptionId === null) {
+        subscriptionId = await this.subscriptionModel.create(
+          email,
+          repo,
+          confirmToken,
+          unsubscribeToken,
+          trx,
+        );
+      }
       const sagaId = await this.sagaModel.start(subscriptionId, trx);
 
       const event: EmailRequestedPayload = {

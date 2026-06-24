@@ -90,13 +90,14 @@ sequenceDiagram
 
 ## App: Orchestrator Components
 
-| Component | File | Role |
-| --------- | ---- | ---- |
-| `SubscriptionSagaModel` | `src/modules/sagas/subscription-saga.model.ts` | CRUD на таблиці `subscription_sagas` |
-| `SubscriptionSagaOrchestrator` | `src/modules/sagas/subscription-saga.orchestrator.ts` | `onEmailSent` → `completed`; `onEmailFailed` → delete subscription + `compensated` |
-| `SagaReplyConsumer` | `src/modules/sagas/saga-reply.consumer.ts` | Підписується на `email.sent` (queue `app.email-sent`) і `email.failed` (queue `app.email-failed`) |
+| Component                      | File                                                  | Role                                                                                              |
+| ------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `SubscriptionSagaModel`        | `src/modules/sagas/subscription-saga.model.ts`        | CRUD на таблиці `subscription_sagas`                                                              |
+| `SubscriptionSagaOrchestrator` | `src/modules/sagas/subscription-saga.orchestrator.ts` | `onEmailSent` → `completed`; `onEmailFailed` → delete subscription + `compensated`                |
+| `SagaReplyConsumer`            | `src/modules/sagas/saga-reply.consumer.ts`            | Підписується на `email.sent` (queue `app.email-sent`) і `email.failed` (queue `app.email-failed`) |
 
 **Атомарна стартова транзакція** (`SubscriptionService.subscribe`):
+
 ```
 BEGIN
   INSERT subscriptions          → повертає subscription_id
