@@ -23,8 +23,11 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         // gives ESLint access to TypeScript types so that it can perform a deep analysis
-        // of the code, rather than just a syntactic one
-        project: ['./tsconfig.json', './tsconfig.eslint.json'],
+        // of the code, rather than just a syntactic one.
+        // tsconfig.eslint.json already extends tsconfig.json and adds the workspace
+        // package `paths`, so listing both would cause src/ files to be matched by
+        // tsconfig.json (no paths) first, making @release-owl/* unresolvable.
+        project: ['./tsconfig.eslint.json'],
         tsconfigRootDir: import.meta.dirname,
       },
       globals: { ...globals.node },
