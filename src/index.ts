@@ -2,7 +2,12 @@ import 'dotenv/config';
 import cron from 'node-cron';
 import app from './app.js';
 import { config } from './platform/config/index.js';
-import { broker, scannerService, outboxRelay } from './container.js';
+import {
+  broker,
+  scannerService,
+  outboxRelay,
+  sagaReplyConsumer,
+} from './container.js';
 import logger from './platform/logger.js';
 
 const PORT = config.server.port;
@@ -18,6 +23,8 @@ async function startApp(): Promise<void> {
   await broker.connect();
   // Start only after the broker is connected so publishes have somewhere to go.
   outboxRelay.start();
+  // Listen for saga reply events (email.sent / email.failed) from notification.
+  await sagaReplyConsumer.start();
 
   const server = app.listen(PORT, () => {
     logger.info({ event: 'server.started', port: PORT }, 'Server started');

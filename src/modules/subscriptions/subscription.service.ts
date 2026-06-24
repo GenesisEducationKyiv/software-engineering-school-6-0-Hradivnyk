@@ -17,6 +17,7 @@ import logger from '../../platform/logger.js';
 import type { IOutboxModel } from '../outbox/index.js';
 import type { IUnitOfWork } from '../../platform/db/unit-of-work.js';
 import type { IGithubService } from '../github/index.js';
+import type { ISagaModel } from '../sagas/index.js';
 import { isValidToken } from './token.js';
 
 const hashEmail = (email: string): string =>
@@ -28,6 +29,7 @@ export class SubscriptionService implements ISubscriptionService {
     private readonly outbox: IOutboxModel,
     private readonly githubService: IGithubService,
     private readonly unitOfWork: IUnitOfWork,
+    private readonly sagaModel: ISagaModel,
   ) {}
 
   async subscribe(email: string, repo: string): Promise<void> {
@@ -59,26 +61,28 @@ export class SubscriptionService implements ISubscriptionService {
     const confirmToken = crypto.randomBytes(32).toString('hex');
     const unsubscribeToken = crypto.randomBytes(32).toString('hex');
 
-    const event: EmailRequestedPayload = {
-      type: 'confirmation',
-      email,
-      repo,
-      confirm_token: confirmToken,
-    };
-
-    // Persist the subscription and the email-requested event in one transaction.
-    // The event is only published (and the email only sent) by the outbox relay
-    // *after* this row is durably committed, so the confirmation link can never
-    // resolve before the record exists — and a broker outage cannot lose the email,
-    // since the relay re-publishes any row still marked unpublished.
+    // Persist the subscription, start the saga, and enqueue the email command in
+    // one atomic transaction. The outbox relay publishes the command only after
+    // the transaction commits, so the notification service always finds a valid
+    // saga row when it replies. saga_id flows through the email.requested command
+    // and back in the email.sent / email.failed reply so the orchestrator can match.
     await this.unitOfWork.run(async (trx) => {
-      await this.subscriptionModel.create(
+      const subscriptionId = await this.subscriptionModel.create(
         email,
         repo,
         confirmToken,
         unsubscribeToken,
         trx,
       );
+      const sagaId = await this.sagaModel.start(subscriptionId, trx);
+
+      const event: EmailRequestedPayload = {
+        type: 'confirmation',
+        email,
+        repo,
+        confirm_token: confirmToken,
+        saga_id: sagaId,
+      };
       await this.outbox.enqueue(EMAIL_REQUESTED, event, trx);
     });
     subscriptionOperationsTotal.inc({
