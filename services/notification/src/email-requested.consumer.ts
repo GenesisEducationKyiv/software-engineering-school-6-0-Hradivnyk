@@ -73,10 +73,30 @@ export class EmailRequestedConsumer {
     const { saga_id, email, confirm_token, repo } = payload;
 
     // Fast pre-check: skip on at-least-once redelivery (idempotent).
+    // Even on a duplicate we re-enqueue the reply so the orchestrator receives
+    // it even if the outbox relay hadn't published it before the crash that
+    // caused the redelivery. The orchestrator's status-guard makes duplicate
+    // replies safe.
     if (await this.inbox.wasProcessed(saga_id)) {
+      const status = await this.inbox.getStatus(saga_id);
+      await this.uow.run(async (trx) => {
+        if (status === 'sent') {
+          await this.outbox.enqueue(EMAIL_SENT, { saga_id, repo }, trx);
+        } else {
+          await this.outbox.enqueue(
+            EMAIL_FAILED,
+            {
+              saga_id,
+              repo,
+              reason: 'previously failed (re-enqueued on duplicate delivery)',
+            },
+            trx,
+          );
+        }
+      });
       this.logger.info(
-        { event: 'email.confirmation_skipped', saga_id, repo },
-        'Duplicate delivery — already processed, skipping',
+        { event: 'email.confirmation_skipped', saga_id, repo, status },
+        'Duplicate delivery — reply re-enqueued, email not resent',
       );
       return;
     }

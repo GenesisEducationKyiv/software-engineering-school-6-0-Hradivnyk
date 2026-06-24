@@ -11,6 +11,13 @@ export interface IInboxModel {
   wasProcessed(key: string, trx?: Knex): Promise<boolean>;
 
   /**
+   * Returns the recorded status for a previously processed key, or null if
+   * the key is not present. Called on duplicate delivery to decide which reply
+   * to re-enqueue without re-sending the email.
+   */
+  getStatus(key: string, trx?: Knex): Promise<InboxStatus | null>;
+
+  /**
    * Inserts a deduplication record. The PK constraint on `id` enforces
    * exactly-once processing: concurrent redeliveries that both pass
    * wasProcessed() will race here and only one will commit.
@@ -27,6 +34,13 @@ export class InboxModel implements IInboxModel {
       .where({ id: key })
       .first();
     return row !== undefined;
+  }
+
+  async getStatus(key: string, trx?: Knex): Promise<InboxStatus | null> {
+    const row = (await (trx ?? this.db)('inbox').where({ id: key }).first()) as
+      | { status: InboxStatus }
+      | undefined;
+    return row?.status ?? null;
   }
 
   async markProcessed(

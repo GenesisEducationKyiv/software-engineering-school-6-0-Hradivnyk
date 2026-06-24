@@ -29,9 +29,13 @@ function fakeNotifier(): jest.Mocked<Notifier> {
   };
 }
 
-function fakeInbox(alreadyProcessed = false): jest.Mocked<IInboxModel> {
+function fakeInbox(
+  alreadyProcessed = false,
+  status: 'sent' | 'failed' | null = null,
+): jest.Mocked<IInboxModel> {
   return {
     wasProcessed: jest.fn().mockResolvedValue(alreadyProcessed),
+    getStatus: jest.fn().mockResolvedValue(status),
     markProcessed: jest.fn().mockResolvedValue(undefined),
   };
 }
@@ -133,10 +137,10 @@ describe('EmailRequestedConsumer — confirmation (saga)', () => {
     expect(notifier.sendNotificationEmail).not.toHaveBeenCalled();
   });
 
-  it('skips send and outbox when the saga_id is already in the inbox (idempotent)', async () => {
+  it('re-enqueues email.sent reply without resending on duplicate when first send succeeded', async () => {
     const broker = new InMemoryBroker();
     const notifier = fakeNotifier();
-    const inbox = fakeInbox(true); // already processed
+    const inbox = fakeInbox(true, 'sent'); // already processed as sent
     const outbox = fakeOutbox();
     const uow = fakeUow();
 
@@ -150,11 +154,40 @@ describe('EmailRequestedConsumer — confirmation (saga)', () => {
     });
 
     expect(notifier.sendConfirmationEmail).not.toHaveBeenCalled();
-    expect(outbox.enqueue).not.toHaveBeenCalled();
+    expect(outbox.enqueue).toHaveBeenCalledWith(
+      EMAIL_SENT,
+      { saga_id: SAGA_ID, repo: 'owner/repo' },
+      fakeTrx,
+    );
     expect(inbox.markProcessed).not.toHaveBeenCalled();
   });
 
-  it('inbox check and outbox enqueue run inside the same UoW transaction on success', async () => {
+  it('re-enqueues email.failed reply without resending on duplicate when first send failed', async () => {
+    const broker = new InMemoryBroker();
+    const notifier = fakeNotifier();
+    const inbox = fakeInbox(true, 'failed'); // already processed as failed
+    const outbox = fakeOutbox();
+    const uow = fakeUow();
+
+    await buildConsumer(broker, notifier, inbox, outbox, uow).start();
+    await broker.publish(EMAIL_REQUESTED, {
+      type: 'confirmation',
+      email: 'a@b.com',
+      repo: 'owner/repo',
+      confirm_token: 'tok',
+      saga_id: SAGA_ID,
+    });
+
+    expect(notifier.sendConfirmationEmail).not.toHaveBeenCalled();
+    expect(outbox.enqueue).toHaveBeenCalledWith(
+      EMAIL_FAILED,
+      expect.objectContaining({ saga_id: SAGA_ID, repo: 'owner/repo' }),
+      fakeTrx,
+    );
+    expect(inbox.markProcessed).not.toHaveBeenCalled();
+  });
+
+  it('inbox markProcessed and outbox enqueue run inside the same UoW transaction on success', async () => {
     const broker = new InMemoryBroker();
     const notifier = fakeNotifier();
     const inbox = fakeInbox();
