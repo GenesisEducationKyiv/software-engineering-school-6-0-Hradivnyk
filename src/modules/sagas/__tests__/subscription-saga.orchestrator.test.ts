@@ -30,6 +30,7 @@ describe('SubscriptionSagaOrchestrator', () => {
     sagaModel = {
       start: jest.fn(),
       findById: jest.fn(),
+      findStartedOlderThan: jest.fn(),
       markCompleted: jest.fn().mockResolvedValue(undefined),
       markCompensated: jest.fn().mockResolvedValue(undefined),
     };
@@ -47,11 +48,13 @@ describe('SubscriptionSagaOrchestrator', () => {
       error: jest.fn(),
       debug: jest.fn(),
     };
+    // Pass initialDelayMs: 0 so retry tests don't add real delays.
     orchestrator = new SubscriptionSagaOrchestrator(
       sagaModel,
       subscriptionModel as unknown as ISubscriptionModel,
       mockUow,
       logger,
+      { attempts: 3, initialDelayMs: 0 },
     );
   });
 
@@ -143,6 +146,52 @@ describe('SubscriptionSagaOrchestrator', () => {
         fakeTrx,
       );
       expect(sagaModel.markCompensated).toHaveBeenCalledWith(SAGA_ID, fakeTrx);
+    });
+  });
+
+  describe('retry on transient DB failures', () => {
+    it('retries onEmailSent and succeeds on the second attempt', async () => {
+      sagaModel.findById.mockResolvedValue(makeSagaRow('started'));
+      mockUow.run
+        .mockRejectedValueOnce(new Error('connection lost'))
+        .mockImplementation(
+          async (work: (trx: Knex.Transaction) => Promise<unknown>) =>
+            work(fakeTrx),
+        );
+
+      await orchestrator.onEmailSent(SAGA_ID);
+
+      expect(mockUow.run).toHaveBeenCalledTimes(2);
+      expect(sagaModel.markCompleted).toHaveBeenCalledTimes(1);
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'saga.handler.retry' }),
+        expect.any(String),
+      );
+    });
+
+    it('retries onEmailFailed and succeeds on the second attempt', async () => {
+      sagaModel.findById.mockResolvedValue(makeSagaRow('started'));
+      mockUow.run
+        .mockRejectedValueOnce(new Error('connection lost'))
+        .mockImplementation(
+          async (work: (trx: Knex.Transaction) => Promise<unknown>) =>
+            work(fakeTrx),
+        );
+
+      await orchestrator.onEmailFailed(SAGA_ID, 'smtp down');
+
+      expect(mockUow.run).toHaveBeenCalledTimes(2);
+      expect(sagaModel.markCompensated).toHaveBeenCalledTimes(1);
+    });
+
+    it('throws after all retry attempts are exhausted', async () => {
+      sagaModel.findById.mockResolvedValue(makeSagaRow('started'));
+      mockUow.run.mockRejectedValue(new Error('DB permanently down'));
+
+      await expect(orchestrator.onEmailSent(SAGA_ID)).rejects.toThrow(
+        'DB permanently down',
+      );
+      expect(mockUow.run).toHaveBeenCalledTimes(3);
     });
   });
 });
