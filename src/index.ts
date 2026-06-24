@@ -7,6 +7,7 @@ import {
   scannerService,
   outboxRelay,
   sagaReplyConsumer,
+  sagaSweeper,
 } from './container.js';
 import logger from './platform/logger.js';
 
@@ -25,6 +26,8 @@ async function startApp(): Promise<void> {
   outboxRelay.start();
   // Listen for saga reply events (email.sent / email.failed) from notification.
   await sagaReplyConsumer.start();
+  // Compensate sagas that never received a reply (e.g. broker message lost).
+  sagaSweeper.start();
 
   const server = app.listen(PORT, () => {
     logger.info({ event: 'server.started', port: PORT }, 'Server started');
@@ -46,6 +49,7 @@ async function startApp(): Promise<void> {
     }, SHUTDOWN_TIMEOUT_MS);
 
     outboxRelay.stop();
+    sagaSweeper.stop();
 
     server.close(() => {
       clearTimeout(timer);

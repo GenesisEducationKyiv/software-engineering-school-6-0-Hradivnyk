@@ -18,6 +18,7 @@ import {
   SubscriptionSagaModel,
   SubscriptionSagaOrchestrator,
   SagaReplyConsumer,
+  SagaSweeper,
 } from './modules/sagas/index.js';
 
 const githubService = new GithubService(
@@ -46,6 +47,12 @@ export const sagaReplyConsumer = new SagaReplyConsumer(
   broker,
   sagaOrchestrator,
   logger,
+);
+export const sagaSweeper = new SagaSweeper(
+  sagaModel,
+  sagaOrchestrator,
+  logger,
+  { intervalMs: config.saga.sweepIntervalMs, timeoutMs: config.saga.timeoutMs },
 );
 
 const subscriptionService = new SubscriptionService(

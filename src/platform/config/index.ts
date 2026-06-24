@@ -48,6 +48,16 @@ export const config = {
     ),
     batchSize: Number.parseInt(optional('OUTBOX_BATCH_SIZE', '50')),
   },
+  saga: {
+    // How often the sweeper checks for stuck sagas (ms).
+    sweepIntervalMs: Number.parseInt(
+      optional('SAGA_SWEEP_INTERVAL_MS', String(5 * 60 * 1000)),
+    ),
+    // Sagas older than this threshold in status='started' are considered stuck.
+    timeoutMs: Number.parseInt(
+      optional('SAGA_TIMEOUT_MS', String(30 * 60 * 1000)),
+    ),
+  },
   auth: {
     apiKey: required('API_KEY'),
   },

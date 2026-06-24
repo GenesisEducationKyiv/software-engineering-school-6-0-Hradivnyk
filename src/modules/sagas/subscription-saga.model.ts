@@ -24,6 +24,13 @@ export interface ISagaModel {
   /** Returns the saga row, or null if not found. */
   findById(sagaId: string, trx?: Knex): Promise<SagaRow | null>;
 
+  /**
+   * Returns all sagas in status='started' whose created_at is older than
+   * `before`. Used by the sweeper to detect and compensate stuck sagas that
+   * never received a reply from the notification service.
+   */
+  findStartedOlderThan(before: Date, trx?: Knex): Promise<SagaRow[]>;
+
   /** Transitions status to 'completed'. */
   markCompleted(sagaId: string, trx: Knex): Promise<void>;
 
@@ -46,6 +53,14 @@ export class SubscriptionSagaModel implements ISagaModel {
       .where({ id: sagaId })
       .first();
     return row !== undefined ? (row as SagaRow) : null;
+  }
+
+  async findStartedOlderThan(before: Date, trx?: Knex): Promise<SagaRow[]> {
+    const rows = (await (trx ?? this.db)('subscription_sagas')
+      .where({ status: 'started' })
+      .where('created_at', '<', before)
+      .select('*')) as unknown as SagaRow[];
+    return rows;
   }
 
   async markCompleted(sagaId: string, trx: Knex): Promise<void> {
