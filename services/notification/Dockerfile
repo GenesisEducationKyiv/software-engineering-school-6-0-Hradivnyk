@@ -33,6 +33,9 @@ COPY --from=builder /app/packages/contracts/dist ./packages/contracts/dist
 COPY --from=builder /app/packages/platform/dist ./packages/platform/dist
 COPY --from=builder /app/services/notification/dist ./services/notification/dist
 
+COPY services/notification/docker-entrypoint.sh ./services/notification/docker-entrypoint.sh
+RUN chmod +x ./services/notification/docker-entrypoint.sh
+
 ENV NODE_ENV=production
 
-CMD ["node", "services/notification/dist/index.js"]
+ENTRYPOINT ["sh", "services/notification/docker-entrypoint.sh"]
