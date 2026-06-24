@@ -139,8 +139,26 @@ describe('POST /api/subscribe', () => {
     expect(res.body).toHaveProperty('error');
   });
 
-  it('returns 409 and keeps only one subscription on duplicate', async () => {
+  it('resends the confirmation and keeps one row when re-subscribing while pending', async () => {
     await subscribe();
+    const res = await subscribe();
+
+    expect(res.status).toBe(200);
+    expect(mockedEmail.sendConfirmationEmail).toHaveBeenCalledTimes(2);
+
+    const rows = await knex('subscriptions').where({
+      email: EMAIL,
+      repo: REPO,
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('pending');
+  });
+
+  it('returns 409 and keeps one row when re-subscribing to a confirmed subscription', async () => {
+    await subscribe();
+    const { confirmToken } = await getTokens();
+    await request(app).get(`/api/confirm/${confirmToken}`);
+
     const res = await subscribe();
 
     expect(res.status).toBe(409);
