@@ -78,7 +78,7 @@ try {
 // 2. Bring the stack up — fail fast (with cleanup) if this step errors,
 //    e.g. when --wait times out waiting for a health-check.
 try {
-  run(`${compose} up -d --wait`);
+  run(`${compose} up -d --build --wait`);
 } catch (err) {
   try {
     run(`${compose} down -v`);

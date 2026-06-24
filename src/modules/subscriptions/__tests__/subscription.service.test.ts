@@ -30,7 +30,7 @@ describe('SubscriptionService', () => {
   beforeEach(() => {
     mockModel = {
       create: jest.fn(),
-      existsByEmailAndRepo: jest.fn(),
+      hasConfirmedSubscription: jest.fn(),
       confirm: jest.fn(),
       deleteByUnsubscribeToken: jest.fn(),
       deleteById: jest.fn(),
@@ -71,7 +71,7 @@ describe('SubscriptionService', () => {
   describe('subscribe', () => {
     beforeEach(() => {
       mockGithubService.repositoryExists.mockResolvedValue(true);
-      mockModel.existsByEmailAndRepo.mockResolvedValue(false);
+      mockModel.hasConfirmedSubscription.mockResolvedValue(false);
       mockModel.create.mockResolvedValue(FAKE_SUBSCRIPTION_ID);
       mockSagaModel.start.mockResolvedValue(FAKE_SAGA_ID);
       mockOutbox.enqueue.mockResolvedValue(undefined);
@@ -149,8 +149,8 @@ describe('SubscriptionService', () => {
       );
     });
 
-    it('should throw DuplicateSubscriptionError if subscription already exists for email and repo', async () => {
-      mockModel.existsByEmailAndRepo.mockResolvedValue(true);
+    it('should throw DuplicateSubscriptionError if a confirmed subscription already exists for email and repo', async () => {
+      mockModel.hasConfirmedSubscription.mockResolvedValue(true);
 
       await expect(service.subscribe(EMAIL, REPO)).rejects.toThrow(
         DuplicateSubscriptionError,

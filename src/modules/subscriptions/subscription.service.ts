@@ -42,11 +42,9 @@ export class SubscriptionService implements ISubscriptionService {
       throw new RepositoryNotFoundError(repo);
     }
 
-    const alreadySubscribed = await this.subscriptionModel.existsByEmailAndRepo(
-      email,
-      repo,
-    );
-    if (alreadySubscribed) {
+    const alreadyConfirmed =
+      await this.subscriptionModel.hasConfirmedSubscription(email, repo);
+    if (alreadyConfirmed) {
       logger.warn(
         { event: 'subscription.duplicate', emailHash: hashEmail(email), repo },
         'Duplicate subscription attempt',

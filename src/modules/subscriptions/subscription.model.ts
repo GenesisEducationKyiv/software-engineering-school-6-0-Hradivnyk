@@ -20,7 +20,7 @@ export interface ISubscriptionModel {
     unsubscribeToken: string,
     trx?: Knex,
   ): Promise<string>;
-  existsByEmailAndRepo(email: string, repo: string): Promise<boolean>;
+  hasConfirmedSubscription(email: string, repo: string): Promise<boolean>;
   confirm(
     confirmToken: string,
   ): Promise<{ email: string; repo: string } | null>;
@@ -70,10 +70,14 @@ export class SubscriptionModel implements ISubscriptionModel {
     await (trx ?? this.db)('subscriptions').where({ id }).delete();
   }
 
-  // Returns true if a subscription for the given email and repo already exists.
-  async existsByEmailAndRepo(email: string, repo: string): Promise<boolean> {
+  // Returns true only when a CONFIRMED subscription exists. A still-pending row is
+  // not treated as a duplicate, so re-subscribing resends the confirmation email.
+  async hasConfirmedSubscription(
+    email: string,
+    repo: string,
+  ): Promise<boolean> {
     const row: unknown = await this.db('subscriptions')
-      .where({ email, repo })
+      .where({ email, repo, status: 'confirmed' })
       .first();
     return row !== undefined;
   }
