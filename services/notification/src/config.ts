@@ -9,6 +9,23 @@ const optional = (key: string, defaultValue: string): string =>
 
 const nodeEnv = optional('NODE_ENV', 'development');
 
+// EMAIL_SENDER controls which IEmailSender implementation is used.
+//   smtp — real Nodemailer transport (default; requires SMTP_* env vars)
+//   stub — no-op sender for benchmarking (no SMTP creds needed)
+const emailSender = optional('EMAIL_SENDER', 'smtp');
+
+// SMTP creds are only required when the real sender is active.
+const smtpConfig =
+  emailSender === 'stub'
+    ? { host: '', port: 587, user: '', pass: '', from: '' }
+    : {
+        host: required('SMTP_HOST'),
+        port: Number.parseInt(optional('SMTP_PORT', '587')),
+        user: required('SMTP_USER'),
+        pass: required('SMTP_PASS'),
+        from: required('SMTP_FROM'),
+      };
+
 export const config = {
   nodeEnv,
   isDev: nodeEnv === 'development',
@@ -24,13 +41,8 @@ export const config = {
   db: {
     url: required('DATABASE_URL'),
   },
-  email: {
-    host: required('SMTP_HOST'),
-    port: Number.parseInt(optional('SMTP_PORT', '587')),
-    user: required('SMTP_USER'),
-    pass: required('SMTP_PASS'),
-    from: required('SMTP_FROM'),
-  },
+  email: smtpConfig,
+  emailSender,
   app: {
     baseUrl: optional('BASE_URL', 'http://localhost:3000'),
   },
@@ -43,6 +55,14 @@ export const config = {
   },
   health: {
     port: Number.parseInt(optional('HEALTH_PORT', '3002')),
+  },
+  grpc: {
+    // Port on which the gRPC server listens inside the container.
+    port: Number.parseInt(optional('GRPC_PORT', '50051')),
+  },
+  rest: {
+    // Port on which the synchronous REST server listens inside the container.
+    port: Number.parseInt(optional('REST_PORT', '4000')),
   },
   outbox: {
     pollIntervalMs: Number.parseInt(

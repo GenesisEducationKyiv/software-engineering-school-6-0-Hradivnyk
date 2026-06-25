@@ -1,9 +1,12 @@
 import 'dotenv/config';
 import http from 'node:http';
+import { ServerCredentials } from '@grpc/grpc-js';
 import {
   broker,
   emailRequestedConsumer,
   outboxRelay,
+  grpcServer,
+  restApp,
   knex,
 } from './container.js';
 import { config } from './config.js';
@@ -17,6 +20,7 @@ async function start(): Promise<void> {
   outboxRelay.start();
   await emailRequestedConsumer.start();
 
+  // ── Health server (node:http, existing) ──────────────────────────────────
   const healthServer = http.createServer((_req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok' }));
@@ -26,6 +30,33 @@ async function start(): Promise<void> {
     logger.info(
       { event: 'health.started', port: config.health.port },
       'Health server started',
+    );
+  });
+
+  // ── gRPC server ──────────────────────────────────────────────────────────
+  await new Promise<void>((resolve, reject) => {
+    grpcServer.bindAsync(
+      `0.0.0.0:${config.grpc.port.toString()}`,
+      ServerCredentials.createInsecure(),
+      (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        logger.info(
+          { event: 'grpc.started', port: config.grpc.port },
+          'gRPC server started',
+        );
+        resolve();
+      },
+    );
+  });
+
+  // ── Synchronous REST server ───────────────────────────────────────────────
+  const restServer = restApp.listen(config.rest.port, () => {
+    logger.info(
+      { event: 'rest.started', port: config.rest.port },
+      'REST server started',
     );
   });
 
@@ -47,16 +78,25 @@ async function start(): Promise<void> {
 
     outboxRelay.stop();
 
-    healthServer.close(() => {
-      clearTimeout(timer);
-      broker
-        .close()
-        .then(async () => knex.destroy())
-        .then(() => process.exit(code))
-        .catch((err: unknown) => {
-          logger.error({ err }, 'Error during shutdown');
-          process.exit(1);
-        });
+    // Drain in-flight gRPC calls then close REST and health servers in parallel.
+    grpcServer.tryShutdown((grpcErr) => {
+      if (grpcErr) {
+        logger.error({ err: grpcErr }, 'gRPC shutdown error');
+      }
+    });
+
+    restServer.close(() => {
+      healthServer.close(() => {
+        clearTimeout(timer);
+        broker
+          .close()
+          .then(async () => knex.destroy())
+          .then(() => process.exit(code))
+          .catch((err: unknown) => {
+            logger.error({ err }, 'Error during shutdown');
+            process.exit(1);
+          });
+      });
     });
   }
 
