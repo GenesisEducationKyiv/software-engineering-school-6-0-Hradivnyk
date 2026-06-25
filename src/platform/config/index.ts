@@ -61,4 +61,14 @@ export const config = {
   auth: {
     apiKey: required('API_KEY'),
   },
+  notification: {
+    // Which Notifier implementation to use for release emails.
+    //   broker — async RabbitMQ publish (default; drives the Saga)
+    //   rest   — synchronous HTTP POST to notification service /api/notify
+    //   grpc   — synchronous gRPC call to notification service
+    notifier: optional('NOTIFIER', 'broker'),
+    restUrl: optional('NOTIFICATION_REST_URL', 'http://localhost:4000'),
+    grpcUrl: optional('NOTIFICATION_GRPC_URL', 'localhost:50051'),
+    timeoutMs: Number.parseInt(optional('NOTIFICATION_TIMEOUT_MS', '5000')),
+  },
 } as const;
