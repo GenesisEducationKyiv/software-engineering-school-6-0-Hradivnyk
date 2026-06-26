@@ -21,6 +21,12 @@ services:
       # Point to the in-network mock instead of the real GitHub API so that
       # E2E tests exercise the full internal stack without an external dependency.
       GITHUB_API_URL: http://github-mock:3001
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO /dev/null http://localhost:3000/']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
     depends_on:
       db:
         condition: service_healthy
