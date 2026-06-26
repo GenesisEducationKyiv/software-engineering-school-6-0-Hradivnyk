@@ -7,6 +7,15 @@ const required = (key: string): string => {
 const optional = (key: string, defaultValue: string): string =>
   process.env[key] ?? defaultValue;
 
+const optionalInt = (key: string, defaultValue: number): number => {
+  const raw = process.env[key];
+  if (raw === undefined) return defaultValue;
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed))
+    throw new Error(`Env variable ${key} must be an integer, got: "${raw}"`);
+  return parsed;
+};
+
 const nodeEnv = optional('NODE_ENV', 'development');
 
 export const config = {
@@ -23,7 +32,7 @@ export const config = {
   ),
   email: {
     host: required('SMTP_HOST'),
-    port: Number.parseInt(optional('SMTP_PORT', '587')),
+    port: optionalInt('SMTP_PORT', 587),
     user: required('SMTP_USER'),
     pass: required('SMTP_PASS'),
     from: required('SMTP_FROM'),
@@ -32,8 +41,8 @@ export const config = {
     baseUrl: optional('BASE_URL', 'http://localhost:3000'),
   },
   retry: {
-    attempts: Number.parseInt(optional('EMAIL_RETRY_ATTEMPTS', '3')),
-    backoffMs: Number.parseInt(optional('EMAIL_RETRY_BACKOFF_MS', '500')),
+    attempts: optionalInt('EMAIL_RETRY_ATTEMPTS', 3),
+    backoffMs: optionalInt('EMAIL_RETRY_BACKOFF_MS', 500),
   },
   rabbitmq: {
     url: optional('RABBITMQ_URL', 'amqp://localhost:5672'),

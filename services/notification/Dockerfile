@@ -35,4 +35,7 @@ COPY --from=builder /app/services/notification/dist ./services/notification/dist
 
 ENV NODE_ENV=production
 
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup && chown -R appuser:appgroup /app
+USER appuser
+
 CMD ["node", "services/notification/dist/index.js"]

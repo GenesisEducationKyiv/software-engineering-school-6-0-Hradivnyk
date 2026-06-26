@@ -24,7 +24,7 @@ echo ""
 echo "Index template '${TEMPLATE_NAME}' applied."
 
 echo "Waiting for Kibana to be available..."
-until curl -sf "${KIBANA_URL}/api/status" | grep -q available; do
+until curl -sf "${KIBANA_URL}/api/status" | grep -q '"level":"available"'; do
   echo "  Kibana not ready, retrying in 5s..."
   sleep 5
 done
