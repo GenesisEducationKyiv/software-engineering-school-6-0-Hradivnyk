@@ -54,7 +54,14 @@ function createNotifier(): Notifier {
         logger,
       );
     case 'grpc':
-      return new GrpcNotifier(config.notification.grpcUrl, logger);
+      return new GrpcNotifier(
+        {
+          grpcUrl: config.notification.grpcUrl,
+          timeoutMs: config.notification.timeoutMs,
+        },
+        logger,
+      );
+    case 'broker':
     default:
       return new BrokerNotifier(broker);
   }

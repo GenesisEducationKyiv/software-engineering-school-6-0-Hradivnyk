@@ -1,10 +1,15 @@
-import { credentials, type ServiceError } from '@grpc/grpc-js';
+import { credentials, Metadata, type ServiceError } from '@grpc/grpc-js';
 import {
   NotificationServiceClient,
   type NotifyRequest,
 } from '@release-owl/proto';
 import type { ILogger } from '../../platform/logger.js';
 import type { Notifier } from './notifier.js';
+
+export interface GrpcNotifierConfig {
+  grpcUrl: string;
+  timeoutMs: number;
+}
 
 /**
  * Sends notification emails via gRPC to the notification service.
@@ -19,11 +24,11 @@ export class GrpcNotifier implements Notifier {
   private readonly client: NotificationServiceClient;
 
   constructor(
-    grpcUrl: string,
+    private readonly config: GrpcNotifierConfig,
     private readonly logger: ILogger,
   ) {
     this.client = new NotificationServiceClient(
-      grpcUrl,
+      config.grpcUrl,
       credentials.createInsecure(),
     );
   }
@@ -58,22 +63,28 @@ export class GrpcNotifier implements Notifier {
   }
 
   private async call(request: NotifyRequest): Promise<void> {
+    const deadline = new Date(Date.now() + this.config.timeoutMs);
     return new Promise((resolve, reject) => {
-      this.client.notify(request, (err: ServiceError | null) => {
-        if (err) {
-          this.logger.error(
-            {
-              event: 'grpc.notify.error',
-              code: err.code,
-              message: err.message,
-            },
-            'gRPC Notify call failed',
-          );
-          reject(err);
-          return;
-        }
-        resolve();
-      });
+      this.client.notify(
+        request,
+        new Metadata(),
+        { deadline },
+        (err: ServiceError | null) => {
+          if (err) {
+            this.logger.error(
+              {
+                event: 'grpc.notify.error',
+                code: err.code,
+                message: err.message,
+              },
+              'gRPC Notify call failed',
+            );
+            reject(err);
+            return;
+          }
+          resolve();
+        },
+      );
     });
   }
 }

@@ -8,6 +8,21 @@ const optional = (key: string, defaultValue: string): string => {
   return process.env[key] ?? defaultValue;
 };
 
+const oneOf = <T extends string>(
+  key: string,
+  allowed: readonly T[],
+  defaultValue: T,
+): T => {
+  const raw = process.env[key];
+  if (raw === undefined) return defaultValue;
+  if (!(allowed as readonly string[]).includes(raw)) {
+    throw new Error(
+      `Env variable ${key} must be one of [${allowed.join(', ')}], got: "${raw}"`,
+    );
+  }
+  return raw as T;
+};
+
 const positiveInt = (key: string, defaultValue: number): number => {
   const raw = process.env[key];
   const value = raw !== undefined ? Number.parseInt(raw, 10) : defaultValue;
@@ -71,9 +86,9 @@ export const config = {
     //   broker — async RabbitMQ publish (default; drives the Saga)
     //   rest   — synchronous HTTP POST to notification service /api/notify
     //   grpc   — synchronous gRPC call to notification service
-    notifier: optional('NOTIFIER', 'broker'),
+    notifier: oneOf('NOTIFIER', ['broker', 'rest', 'grpc'] as const, 'broker'),
     restUrl: optional('NOTIFICATION_REST_URL', 'http://localhost:4000'),
     grpcUrl: optional('NOTIFICATION_GRPC_URL', 'localhost:50051'),
-    timeoutMs: Number.parseInt(optional('NOTIFICATION_TIMEOUT_MS', '5000')),
+    timeoutMs: positiveInt('NOTIFICATION_TIMEOUT_MS', 5000),
   },
 } as const;

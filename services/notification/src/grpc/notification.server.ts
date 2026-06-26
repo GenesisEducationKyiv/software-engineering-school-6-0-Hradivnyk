@@ -112,8 +112,9 @@ export function createGrpcServer(notifier: Notifier, logger: ILogger): Server {
         const grpcStatus = isTransient(err)
           ? status.UNAVAILABLE
           : status.INTERNAL;
-        const message =
-          err instanceof Error ? err.message : 'email send failed';
+        const message = isTransient(err)
+          ? 'temporary failure, please retry later'
+          : 'internal error';
         callback({ code: grpcStatus, message });
       }
     },

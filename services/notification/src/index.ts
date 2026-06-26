@@ -83,30 +83,34 @@ async function start(): Promise<void> {
 
     outboxRelay.stop();
 
-    // Drain in-flight gRPC calls then close REST and health servers in parallel.
-    grpcServer.tryShutdown((grpcErr) => {
-      if (grpcErr) {
-        logger.error({ err: grpcErr }, 'gRPC shutdown error');
-      }
-    });
-
-    restServer.close(() => {
-      healthServer.close(() => {
-        emailRequestedConsumer.stop();
-        broker
-          .close()
-          .then(async () => knex.destroy())
-          .then(() => {
-            clearTimeout(timer);
-            process.exit(code);
-          })
-          .catch((err: unknown) => {
-            clearTimeout(timer);
-            logger.error({ err }, 'Error during shutdown');
-            process.exit(1);
-          });
+    const grpcDone = new Promise<void>((resolve) => {
+      grpcServer.tryShutdown((grpcErr) => {
+        if (grpcErr) logger.error({ err: grpcErr }, 'gRPC shutdown error');
+        resolve();
       });
     });
+    const restDone = new Promise<void>((resolve) => {
+      restServer.close(() => resolve());
+    });
+    const healthDone = new Promise<void>((resolve) => {
+      healthServer.close(() => resolve());
+    });
+
+    Promise.all([grpcDone, restDone, healthDone])
+      .then(async () => {
+        emailRequestedConsumer.stop();
+        return broker.close();
+      })
+      .then(async () => knex.destroy())
+      .then(() => {
+        clearTimeout(timer);
+        process.exit(code);
+      })
+      .catch((err: unknown) => {
+        clearTimeout(timer);
+        logger.error({ err }, 'Error during shutdown');
+        process.exit(1);
+      });
   }
 
   process.on('SIGTERM', () => {

@@ -40,7 +40,10 @@ function createNotifier(notifierEnv: string): Notifier {
         noopLogger,
       );
     case 'grpc':
-      return new GrpcNotifier('localhost:50051', noopLogger);
+      return new GrpcNotifier(
+        { grpcUrl: 'localhost:50051', timeoutMs: 5000 },
+        noopLogger,
+      );
     default:
       return new BrokerNotifier(fakeBroker);
   }
