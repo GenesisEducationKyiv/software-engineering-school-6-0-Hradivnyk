@@ -93,11 +93,25 @@ flowchart TD
 
 ## 3. Constraints
 
-- **GitHub API rate limit:** 60 req/hour without token, 5 000 req/hour with `GITHUB_TOKEN`.
-- **In-process scheduler:** `node-cron` shares the Event Loop with the HTTP server — long scans can delay requests.
-- **At-least-once delivery:** the outbox relay may re-publish an event after a crash. The notification service handles duplicates via inbox deduplication (`saga_id` PK).
-- **No horizontal scaling:** multiple instances would produce duplicate release notifications (see [Future Work](#8-future-work)).
-- **Single-node PostgreSQL and RabbitMQ** — no replicas, no DLQ configured.
+### Technical Constraints
+
+- **GitHub API rate limit without a token:** 60 requests/hour per IP. With N unique repositories on an hourly cron schedule, the system can process at most 60 repos without `GITHUB_TOKEN`. With a token — 5,000 requests/hour.
+- **In-process scheduler:** `node-cron` runs in the same Event Loop as the HTTP server. A long scan cycle can delay HTTP request handling with a large number of repositories.
+- **No retry mechanism for GitHub requests:** transient GitHub API failures result in a missed notification until the next cron tick.
+- **No horizontal scaling:** single process + single DB instance. Running multiple instances will cause duplicate notifications (see [Future Work](#8-future-work)).
+- **At-least-once delivery via outbox:** the outbox relay may re-publish an event if it crashes after publishing but before marking the row as published. The notification service handles duplicates via inbox deduplication (`saga_id` PK).
+
+### Business Constraints
+
+- The service monitors only **public GitHub repositories** (no OAuth for private repos).
+- Only **official GitHub releases** (`/releases/latest`) are tracked — not tags or pre-releases.
+- Only **one active subscription** per `(email, repo)` pair is supported.
+
+### Infrastructure Constraints
+
+- Deployed on a **single EC2 instance** (no load balancer, no auto-scaling).
+- Database — **single-node PostgreSQL** with no replicas and no backup beyond the Docker volume.
+- Message broker — **single-node RabbitMQ** with a persistent durable queue, no DLQ configured.
 
 ---
 
@@ -326,36 +340,35 @@ SMTP retry policy: up to `EMAIL_RETRY_ATTEMPTS` (default: 3) attempts with initi
 
 **`app` service** — fail-fast validation on startup:
 
-**`app` service:**
-
+```env
+DATABASE_URL              → required
+RABBITMQ_URL              → optional (default: amqp://localhost:5672)
+API_KEY                   → required (enables X-API-Key auth)
+GITHUB_TOKEN              → optional (increases rate limit to 5,000/hour)
+BASE_URL                  → optional (default: http://localhost:3000)
+ALLOWED_ORIGIN            → optional (default: '*')
+PORT                      → optional (default: 3000)
+SCANNER_CRON_SCHEDULE     → optional (default: '0 * * * *')
+OUTBOX_POLL_INTERVAL_MS   → optional (default: 1000)
+OUTBOX_BATCH_SIZE         → optional (default: 50)
 ```
-DATABASE_URL            required
-API_KEY                 required
-RABBITMQ_URL            optional  (default: amqp://localhost:5672)
-GITHUB_TOKEN            optional  (increases rate limit to 5 000/hour)
-BASE_URL                optional  (default: http://localhost:3000)
-PORT                    optional  (default: 3000)
-SCANNER_CRON_SCHEDULE   optional  (default: '0 * * * *')
-OUTBOX_POLL_INTERVAL_MS optional  (default: 1000)
-OUTBOX_BATCH_SIZE       optional  (default: 50)
-```
 
-**`notification` service:**
+**`notification` service** — fail-fast validation on startup:
 
-```
-DATABASE_URL            required  (own PostgreSQL)
-SMTP_HOST               required
-SMTP_USER               required
-SMTP_PASS               required
-SMTP_FROM               required
-RABBITMQ_URL            optional  (default: amqp://localhost:5672)
-SMTP_PORT               optional  (default: 587)
-BASE_URL                optional  (default: http://localhost:3000)
-EMAIL_RETRY_ATTEMPTS    optional  (default: 3)
-EMAIL_RETRY_BACKOFF_MS  optional  (default: 500)
-HEALTH_PORT             optional  (default: 3002)
-OUTBOX_POLL_INTERVAL_MS optional  (default: 1000)
-OUTBOX_BATCH_SIZE       optional  (default: 50)
+```env
+DATABASE_URL              → required (own PostgreSQL)
+RABBITMQ_URL              → optional (default: amqp://localhost:5672)
+SMTP_HOST                 → required
+SMTP_PORT                 → optional (default: 587)
+SMTP_USER                 → required
+SMTP_PASS                 → required
+SMTP_FROM                 → required
+BASE_URL                  → optional (default: http://localhost:3000)
+EMAIL_RETRY_ATTEMPTS      → optional (default: 3)
+EMAIL_RETRY_BACKOFF_MS    → optional (default: 500)
+HEALTH_PORT               → optional (default: 3002)
+OUTBOX_POLL_INTERVAL_MS   → optional (default: 1000)
+OUTBOX_BATCH_SIZE         → optional (default: 50)
 ```
 
 ---
@@ -603,7 +616,7 @@ Published by the `app` service (via outbox relay for confirmations; directly for
 
 **Log pipeline:**
 
-```
+```text
 Node.js (Pino JSON) → Docker log driver → Filebeat → Elasticsearch → Kibana
 ```
 

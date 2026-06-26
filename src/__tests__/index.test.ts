@@ -58,12 +58,14 @@ describe('index startup', () => {
       _port: unknown,
       cb: () => void,
     ) => {
-      cb();
-    }) as typeof app.listen);
+      setImmediate(cb);
+      return { once: jest.fn(), close: jest.fn() };
+    }) as unknown as typeof app.listen);
 
     await import('../index.js');
-    // broker.connect() is awaited before app.listen(), so let the
-    // microtask/macrotask queue drain before asserting.
+    // broker.connect() resolves as a microtask; app.listen schedules
+    // the ready callback via setImmediate — drain both rounds.
+    await flushAsync();
     await flushAsync();
 
     const { scannerService } = await import('../container.js');
