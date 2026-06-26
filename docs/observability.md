@@ -12,7 +12,7 @@ Structured JSON logging via **Pino** + `pino-http` for HTTP requests. Aggregated
 
 **Pipeline:**
 
-```
+```text
 Node.js (Pino JSON) → Docker log driver → Filebeat → Elasticsearch → Kibana
 ```
 
@@ -28,7 +28,7 @@ Exposed at `GET /metrics` (Prometheus format via `prom-client`). Blocked externa
 
 **Pipeline:**
 
-```
+```text
 Node.js (prom-client) → GET /metrics → Prometheus → Grafana
 ```
 

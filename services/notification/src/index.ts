@@ -26,11 +26,16 @@ async function start(): Promise<void> {
     res.end(JSON.stringify({ status: 'ok' }));
   });
 
-  healthServer.listen(config.health.port, () => {
-    logger.info(
-      { event: 'health.started', port: config.health.port },
-      'Health server started',
-    );
+  await new Promise<void>((resolve, reject) => {
+    healthServer.once('error', reject);
+    healthServer.listen(config.health.port, () => {
+      healthServer.off('error', reject);
+      logger.info(
+        { event: 'health.started', port: config.health.port },
+        'Health server started',
+      );
+      resolve();
+    });
   });
 
   // ── gRPC server ──────────────────────────────────────────────────────────
@@ -87,12 +92,16 @@ async function start(): Promise<void> {
 
     restServer.close(() => {
       healthServer.close(() => {
-        clearTimeout(timer);
+        emailRequestedConsumer.stop();
         broker
           .close()
           .then(async () => knex.destroy())
-          .then(() => process.exit(code))
+          .then(() => {
+            clearTimeout(timer);
+            process.exit(code);
+          })
           .catch((err: unknown) => {
+            clearTimeout(timer);
             logger.error({ err }, 'Error during shutdown');
             process.exit(1);
           });

@@ -34,7 +34,7 @@
         "version": { "type": "keyword" },
         "env": { "type": "keyword" },
         "repo": { "type": "keyword" },
-        "email": { "type": "keyword" },
+        "emailHash": { "type": "keyword" },
         "requestId": { "type": "keyword" },
         "durationMs": { "type": "long" },
         "port": { "type": "integer" },

@@ -16,9 +16,10 @@ type SubscriptionRecord = {
 
 export class RabbitMQBroker extends EventEmitter implements IBroker {
   private connection: amqplib.ChannelModel | null = null;
-  private channel: amqplib.Channel | null = null;
+  private channel: amqplib.ConfirmChannel | null = null;
   private subscriptions: SubscriptionRecord[] = [];
   private isClosing = false;
+  private isReconnecting = false;
 
   constructor(
     private readonly url: string,
@@ -63,11 +64,13 @@ export class RabbitMQBroker extends EventEmitter implements IBroker {
 
   private async setupConnection(): Promise<void> {
     this.connection = await amqplib.connect(this.url);
-    this.channel = await this.connection.createChannel();
+    this.channel = await this.connection.createConfirmChannel();
     await this.channel.assertExchange(EXCHANGE, 'topic', { durable: true });
 
     this.connection.on('close', () => {
-      if (!this.isClosing) {
+      if (!this.isClosing && !this.isReconnecting) {
+        this.connection = null;
+        this.channel = null;
         this.logger.warn(
           { event: 'broker.connection_lost' },
           'RabbitMQ connection closed, reconnecting',
@@ -95,47 +98,62 @@ export class RabbitMQBroker extends EventEmitter implements IBroker {
   }
 
   private async reconnectWithBackoff(): Promise<void> {
+    this.isReconnecting = true;
     let attempt = 0;
     let delay = INITIAL_BACKOFF_MS;
 
-    while (attempt < MAX_RETRIES) {
-      attempt++;
-      this.logger.info(
-        { event: 'broker.reconnect_attempt', attempt, maxRetries: MAX_RETRIES },
-        `Reconnect attempt ${attempt.toString()}/${MAX_RETRIES.toString()}`,
-      );
-      try {
-        // eslint-disable-next-line no-await-in-loop -- retries are inherently sequential
-        await this.setupConnection();
+    try {
+      while (attempt < MAX_RETRIES) {
+        if (this.isClosing) return;
+        attempt++;
         this.logger.info(
-          { event: 'broker.reconnected' },
-          'RabbitMQ reconnected',
+          {
+            event: 'broker.reconnect_attempt',
+            attempt,
+            maxRetries: MAX_RETRIES,
+          },
+          `Reconnect attempt ${attempt.toString()}/${MAX_RETRIES.toString()}`,
         );
-        return;
-      } catch (err) {
-        this.logger.error(
-          { event: 'broker.reconnect_failed', attempt, err },
-          'Reconnect attempt failed',
-        );
-        // eslint-disable-next-line no-await-in-loop -- backoff sleep between retries
-        await new Promise<void>((resolve) => setTimeout(resolve, delay));
-        delay = Math.min(delay * 2, MAX_BACKOFF_MS);
+        try {
+          // eslint-disable-next-line no-await-in-loop -- retries are inherently sequential
+          await this.setupConnection();
+          this.logger.info(
+            { event: 'broker.reconnected' },
+            'RabbitMQ reconnected',
+          );
+          return;
+        } catch (err) {
+          this.logger.error(
+            { event: 'broker.reconnect_failed', attempt, err },
+            'Reconnect attempt failed',
+          );
+          if (this.isClosing) return;
+          // eslint-disable-next-line no-await-in-loop -- backoff sleep between retries
+          await new Promise<void>((resolve) => setTimeout(resolve, delay));
+          delay = Math.min(delay * 2, MAX_BACKOFF_MS);
+        }
       }
-    }
 
-    this.logger.error(
-      { event: 'broker.reconnect_exhausted', maxRetries: MAX_RETRIES },
-      'RabbitMQ reconnect retries exhausted',
-    );
-    this.emit('fatal', new Error('RabbitMQ reconnect retries exhausted'));
+      this.logger.error(
+        { event: 'broker.reconnect_exhausted', maxRetries: MAX_RETRIES },
+        'RabbitMQ reconnect retries exhausted',
+      );
+      this.emit('fatal', new Error('RabbitMQ reconnect retries exhausted'));
+    } finally {
+      this.isReconnecting = false;
+    }
   }
 
-  // channel.publish() is synchronous by design in amqplib.
-  // eslint-disable-next-line @typescript-eslint/require-await
   async publish<T>(routingKey: string, payload: T): Promise<void> {
     if (!this.channel) throw new Error('Broker not connected');
     const content = Buffer.from(JSON.stringify(payload));
-    this.channel.publish(EXCHANGE, routingKey, content, { persistent: true });
+    const ch = this.channel;
+    return new Promise<void>((resolve, reject) => {
+      ch.publish(EXCHANGE, routingKey, content, { persistent: true }, (err) => {
+        if (err) reject(err instanceof Error ? err : new Error(String(err)));
+        else resolve();
+      });
+    });
   }
 
   async subscribe<T>(

@@ -26,9 +26,15 @@ export async function up(knex: Knex): Promise<void> {
       .notNullable()
       .defaultTo(knex.fn.now());
 
-    // Efficient lookup when the orchestrator receives a reply event.
-    table.index(['status'], 'subscription_sagas_status_idx');
+    // Composite index: sweeper filters by status='started' and age, so include both columns.
+    table.index(['status', 'created_at'], 'subscription_sagas_status_idx');
   });
+  // Prevent invalid states at the database level.
+  await knex.raw(`
+    ALTER TABLE subscription_sagas
+      ADD CONSTRAINT subscription_sagas_type_chk CHECK (type IN ('subscribe')),
+      ADD CONSTRAINT subscription_sagas_status_chk CHECK (status IN ('started', 'completed', 'compensated'))
+  `);
 }
 
 export async function down(knex: Knex): Promise<void> {

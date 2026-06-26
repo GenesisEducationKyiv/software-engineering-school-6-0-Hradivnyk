@@ -98,7 +98,7 @@ sequenceDiagram
 
 **Атомарна стартова транзакція** (`SubscriptionService.subscribe`):
 
-```
+```sql
 BEGIN
   INSERT subscriptions          → повертає subscription_id
   INSERT subscription_sagas     → повертає saga_id (correlation id)
@@ -116,7 +116,7 @@ COMMIT
 
 Тільки `type: 'confirmation'` бере участь у сазі. `type: 'notification'` (release emails) — fire-and-forget без змін.
 
-```
+```text
 1. inbox.wasProcessed(saga_id)?  →  так: ack, return (ідемпотентно)
 2. sendConfirmationEmail()       →  RetryingEmailSender (N спроб з backoff)
 3a. Успіх:

@@ -172,10 +172,11 @@ docker run --rm caddy:2-alpine caddy hash-password --plaintext yourpassword
 See [testing.md](testing.md) for full details on unit, integration, and E2E tests.
 
 ```bash
-npm test                  # all tests
-npm run test:unit         # unit tests only
-npm run test:integration  # integration tests only
-npm run test:coverage     # with coverage report
+npm run ci                    # full CI check: quality + all tests (requires Docker)
+npm run quality               # lint, format, typecheck, build — no Docker needed
+npm test                      # all tests: unit + integration + e2e (requires Docker)
+npm run test:unit             # unit tests only
+npm run test:unit:coverage    # unit tests with coverage report
 ```
 
 ---

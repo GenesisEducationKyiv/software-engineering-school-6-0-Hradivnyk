@@ -44,7 +44,7 @@ paths:
           type: 'string'
       responses:
         '200':
-          description: 'Subscription created. Confirmation email queued for delivery.'
+          description: 'Subscription successful. Confirmation email sent.'
         '400':
           description: 'Invalid input (e.g., invalid repo format)'
         '401':

@@ -49,9 +49,9 @@ export class SubscriptionSagaModel implements ISagaModel {
   }
 
   async findById(sagaId: string, trx?: Knex): Promise<SagaRow | null> {
-    const row: unknown = await (trx ?? this.db)('subscription_sagas')
-      .where({ id: sagaId })
-      .first();
+    let q = (trx ?? this.db)('subscription_sagas').where({ id: sagaId });
+    if (trx) q = q.forUpdate();
+    const row: unknown = await q.first();
     return row !== undefined ? (row as SagaRow) : null;
   }
 

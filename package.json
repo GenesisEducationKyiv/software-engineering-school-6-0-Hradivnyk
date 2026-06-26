@@ -43,6 +43,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "quality": "npm run lint && npm run format:check && npm run typecheck && npm run build",
+    "ci": "npm run quality && npm run test",
     "test": "npm run test:unit && npm run test:integration:ci && npm run test:e2e:ci",
     "test:unit": "jest --selectProjects unit notification",
     "test:unit:coverage": "npm run test:unit -- --coverage",

@@ -41,4 +41,7 @@ RUN chmod +x ./services/notification/docker-entrypoint.sh
 
 ENV NODE_ENV=production
 
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup && chown -R appuser:appgroup /app
+USER appuser
+
 ENTRYPOINT ["sh", "services/notification/docker-entrypoint.sh"]

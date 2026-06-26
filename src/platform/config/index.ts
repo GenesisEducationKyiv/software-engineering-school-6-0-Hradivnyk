@@ -8,6 +8,17 @@ const optional = (key: string, defaultValue: string): string => {
   return process.env[key] ?? defaultValue;
 };
 
+const positiveInt = (key: string, defaultValue: number): number => {
+  const raw = process.env[key];
+  const value = raw !== undefined ? Number.parseInt(raw, 10) : defaultValue;
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(
+      `Env variable ${key} must be a positive integer, got: ${raw ?? defaultValue}`,
+    );
+  }
+  return value;
+};
+
 const nodeEnv = optional('NODE_ENV', 'development');
 
 export const config = {
@@ -43,20 +54,14 @@ export const config = {
     cronSchedule: optional('SCANNER_CRON_SCHEDULE', '0 * * * *'),
   },
   outbox: {
-    pollIntervalMs: Number.parseInt(
-      optional('OUTBOX_POLL_INTERVAL_MS', '1000'),
-    ),
-    batchSize: Number.parseInt(optional('OUTBOX_BATCH_SIZE', '50')),
+    pollIntervalMs: positiveInt('OUTBOX_POLL_INTERVAL_MS', 1000),
+    batchSize: positiveInt('OUTBOX_BATCH_SIZE', 50),
   },
   saga: {
     // How often the sweeper checks for stuck sagas (ms).
-    sweepIntervalMs: Number.parseInt(
-      optional('SAGA_SWEEP_INTERVAL_MS', String(5 * 60 * 1000)),
-    ),
+    sweepIntervalMs: positiveInt('SAGA_SWEEP_INTERVAL_MS', 5 * 60 * 1000),
     // Sagas older than this threshold in status='started' are considered stuck.
-    timeoutMs: Number.parseInt(
-      optional('SAGA_TIMEOUT_MS', String(30 * 60 * 1000)),
-    ),
+    timeoutMs: positiveInt('SAGA_TIMEOUT_MS', 30 * 60 * 1000),
   },
   auth: {
     apiKey: required('API_KEY'),

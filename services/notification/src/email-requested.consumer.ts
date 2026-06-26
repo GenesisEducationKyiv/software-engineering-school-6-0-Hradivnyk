@@ -29,6 +29,7 @@ const QUEUE = 'notification.email-requested';
  */
 export class EmailRequestedConsumer {
   private started = false;
+  private stopping = false;
 
   constructor(
     private readonly broker: IBroker,
@@ -39,13 +40,17 @@ export class EmailRequestedConsumer {
     private readonly uow: IUnitOfWork,
   ) {}
 
+  stop(): void {
+    this.stopping = true;
+  }
+
   async start(): Promise<void> {
     if (this.started) return;
-    this.started = true;
     await this.broker.subscribe(
       QUEUE,
       EMAIL_REQUESTED,
       async (raw): Promise<void> => {
+        if (this.stopping) return;
         const payload = EmailRequestedPayloadSchema.parse(raw);
 
         if (payload.type === 'confirmation') {
@@ -65,6 +70,7 @@ export class EmailRequestedConsumer {
         }
       },
     );
+    this.started = true;
   }
 
   private async handleConfirmation(

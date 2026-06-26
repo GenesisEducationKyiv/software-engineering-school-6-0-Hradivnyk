@@ -1,5 +1,7 @@
 import type { Knex } from 'knex';
 
+const MAX_PUBLISH_ATTEMPTS = 10;
+
 export interface OutboxRecord {
   id: string;
   routing_key: string;
@@ -36,7 +38,7 @@ export class OutboxModel implements IOutboxModel {
   ): Promise<void> {
     await trx('outbox').insert({
       routing_key: routingKey,
-      payload: JSON.stringify(payload),
+      payload: payload,
     });
   }
 
@@ -47,6 +49,7 @@ export class OutboxModel implements IOutboxModel {
         qb.select('id')
           .from('outbox')
           .whereNull('published_at')
+          .where('attempts', '<', MAX_PUBLISH_ATTEMPTS)
           .orderBy('created_at')
           .limit(limit)
           .forUpdate()
