@@ -47,7 +47,7 @@ export class SubscriptionService implements ISubscriptionService {
         operation: 'subscribe',
         result: 'duplicate',
       });
-      throw new DuplicateSubscriptionError(email, repo);
+      throw new DuplicateSubscriptionError(repo);
     }
 
     const confirmToken = crypto.randomBytes(32).toString('hex');

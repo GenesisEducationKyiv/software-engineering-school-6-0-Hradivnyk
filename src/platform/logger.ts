@@ -1,5 +1,5 @@
-import fs from 'node:fs';
-import path from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import pino from 'pino';
 import { config } from './config/index.js';
 import { requestContext } from '../utils/requestContext.js';
@@ -12,7 +12,7 @@ export interface ILogger {
 }
 
 const { name, version } = JSON.parse(
-  fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf-8'),
+  readFileSync(join(process.cwd(), 'package.json'), 'utf-8'),
 ) as { name: string; version: string };
 
 const baseLogger = pino({
