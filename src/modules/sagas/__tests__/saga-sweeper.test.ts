@@ -86,9 +86,9 @@ describe('SagaSweeper', () => {
 
     const [cutoff] = sagaModel.findStartedOlderThan.mock.calls[0];
     const cutoffMs = cutoff.getTime();
-    // cutoff should be approximately now - 30 min
-    expect(cutoffMs).toBeLessThan(before - 30 * 60 * 1000 + 100);
-    expect(cutoffMs).toBeGreaterThan(before - 30 * 60 * 1000 - 100);
+    // cutoff should be approximately now - 30 min (allow 1 s margin for slow CI)
+    expect(cutoffMs).toBeLessThan(before - 30 * 60 * 1000 + 1000);
+    expect(cutoffMs).toBeGreaterThan(before - 30 * 60 * 1000 - 1000);
   });
 
   it('continues compensating remaining sagas when one compensation fails', async () => {
@@ -112,8 +112,7 @@ describe('SagaSweeper', () => {
     );
   });
 
-  it('sweep() itself does not throw when findStartedOlderThan rejects', async () => {
-    // tick() catches the error so the interval survives; sweep() throws (tested via tick indirectly)
+  it('sweep() propagates the error when findStartedOlderThan rejects', async () => {
     sagaModel.findStartedOlderThan.mockRejectedValue(new Error('DB down'));
 
     await expect(sweeper.sweep()).rejects.toThrow('DB down');

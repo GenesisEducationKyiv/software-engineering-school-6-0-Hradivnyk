@@ -222,7 +222,7 @@ sequenceDiagram
 
 Middleware pipeline (in order):
 
-```
+```text
 express.static(public/)   → landing page
 helmet()                  → security headers
 cors()                    → CORS allowlist
@@ -550,7 +550,7 @@ Get all active subscriptions for an email address.
 
 **Headers:**
 
-```
+```http
 Accept: application/vnd.github+json
 X-GitHub-Api-Version: 2022-11-28
 Authorization: Bearer {GITHUB_TOKEN}   (optional)
@@ -632,7 +632,7 @@ Metrics are exposed at `GET /metrics` in Prometheus exposition format via **prom
 
 **Metric pipeline:**
 
-```
+```text
 Node.js (prom-client) → GET /metrics → Prometheus (scrape) → Grafana (visualise)
 ```
 

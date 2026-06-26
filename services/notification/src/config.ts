@@ -54,9 +54,7 @@ export const config = {
     port: optionalInt('HEALTH_PORT', 3002),
   },
   outbox: {
-    pollIntervalMs: Number.parseInt(
-      optional('OUTBOX_POLL_INTERVAL_MS', '1000'),
-    ),
-    batchSize: Number.parseInt(optional('OUTBOX_BATCH_SIZE', '50')),
+    pollIntervalMs: optionalInt('OUTBOX_POLL_INTERVAL_MS', 1000),
+    batchSize: optionalInt('OUTBOX_BATCH_SIZE', 50),
   },
 } as const;

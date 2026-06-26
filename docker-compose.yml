@@ -82,6 +82,10 @@ services:
       - caddy_config:/config
     environment:
       DOMAIN: ${DOMAIN:-localhost}
+      GRAFANA_USER: ${GRAFANA_USER:-admin}
+      GRAFANA_HASHED_PASSWORD: ${GRAFANA_HASHED_PASSWORD}
+      KIBANA_USER: ${KIBANA_USER:-kibana}
+      KIBANA_HASHED_PASSWORD: ${KIBANA_HASHED_PASSWORD}
     depends_on:
       - app
     restart: unless-stopped

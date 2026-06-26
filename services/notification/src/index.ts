@@ -53,6 +53,7 @@ async function start(): Promise<void> {
     outboxRelay.stop();
 
     healthServer.close(() => {
+      emailRequestedConsumer.stop();
       broker
         .close()
         .then(async () => knex.destroy())

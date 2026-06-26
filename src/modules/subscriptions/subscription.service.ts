@@ -20,6 +20,15 @@ import type { IGithubService } from '../github/index.js';
 import type { ISagaModel } from '../sagas/index.js';
 import { isValidToken } from './token.js';
 
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    err.code === '23505'
+  );
+}
+
 const hashEmail = (email: string): string =>
   crypto.createHash('sha256').update(email).digest('hex').slice(0, 12);
 
@@ -76,13 +85,19 @@ export class SubscriptionService implements ISubscriptionService {
           trx,
         );
       if (subscriptionId === null) {
-        subscriptionId = await this.subscriptionModel.create(
-          email,
-          repo,
-          confirmToken,
-          unsubscribeToken,
-          trx,
-        );
+        try {
+          subscriptionId = await this.subscriptionModel.create(
+            email,
+            repo,
+            confirmToken,
+            unsubscribeToken,
+            trx,
+          );
+        } catch (err: unknown) {
+          if (isUniqueViolation(err))
+            throw new DuplicateSubscriptionError(repo);
+          throw err;
+        }
       }
       const sagaId = await this.sagaModel.start(subscriptionId, trx);
 

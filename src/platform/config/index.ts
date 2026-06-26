@@ -59,13 +59,9 @@ export const config = {
   },
   saga: {
     // How often the sweeper checks for stuck sagas (ms).
-    sweepIntervalMs: Number.parseInt(
-      optional('SAGA_SWEEP_INTERVAL_MS', String(5 * 60 * 1000)),
-    ),
+    sweepIntervalMs: positiveInt('SAGA_SWEEP_INTERVAL_MS', 5 * 60 * 1000),
     // Sagas older than this threshold in status='started' are considered stuck.
-    timeoutMs: Number.parseInt(
-      optional('SAGA_TIMEOUT_MS', String(30 * 60 * 1000)),
-    ),
+    timeoutMs: positiveInt('SAGA_TIMEOUT_MS', 30 * 60 * 1000),
   },
   auth: {
     apiKey: required('API_KEY'),
