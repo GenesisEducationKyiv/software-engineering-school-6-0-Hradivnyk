@@ -137,7 +137,7 @@ describe('SubscriptionController', () => {
     });
 
     it('should call next with DuplicateSubscriptionError when service throws it', async () => {
-      const error = new DuplicateSubscriptionError(EMAIL, REPO);
+      const error = new DuplicateSubscriptionError(REPO);
       mockService.subscribe.mockRejectedValue(error);
       const { res } = mockRes();
 
