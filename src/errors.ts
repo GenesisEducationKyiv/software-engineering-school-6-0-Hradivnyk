@@ -15,8 +15,8 @@ export class RepositoryNotFoundError extends AppError {
 }
 
 export class DuplicateSubscriptionError extends AppError {
-  constructor(email: string, repo: string) {
-    super(`Email ${email} is already subscribed to ${repo}`, 409);
+  constructor(repo: string) {
+    super(`Already subscribed to ${repo}`, 409);
   }
 }
 

@@ -22,6 +22,11 @@ export default async function globalSetup(): Promise<void> {
         '  cp .env.test.example .env.test',
     );
   }
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      'Missing DATABASE_URL in .env.test — set DATABASE_URL to your test database',
+    );
+  }
 
   const migrationsDir = join(process.cwd(), 'src', 'db', 'migrations');
 

@@ -11,7 +11,7 @@ jest.mock('../app.js', () => ({
   default: { listen: jest.fn() },
 }));
 jest.mock('../container.js', () => ({
-  scannerService: { scan: jest.fn() },
+  scannerService: { scan: jest.fn(), start: jest.fn() },
 }));
 jest.mock('../utils/logger.js', () => ({
   __esModule: true,
@@ -37,7 +37,7 @@ describe('index startup', () => {
     );
   });
 
-  it('should register a cron job with the configured schedule on a valid cron', async () => {
+  it('should call scannerService.start() on a valid cron schedule', async () => {
     const { default: cron } = await import('node-cron');
     jest.mocked(cron).validate.mockReturnValue(true);
 
@@ -51,10 +51,7 @@ describe('index startup', () => {
 
     await import('../index.js');
 
-    const { config } = await import('../config/index.js');
-    expect(jest.mocked(cron).schedule).toHaveBeenCalledWith(
-      config.scanner.cronSchedule,
-      expect.any(Function),
-    );
+    const { scannerService } = await import('../container.js');
+    expect(jest.mocked(scannerService.start)).toHaveBeenCalled();
   });
 });

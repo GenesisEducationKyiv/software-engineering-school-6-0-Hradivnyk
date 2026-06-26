@@ -14,13 +14,6 @@ if (!cron.validate(config.scanner.cronSchedule)) {
 }
 
 app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-
-  cron.schedule(config.scanner.cronSchedule, () => {
-    scannerService.scan().catch((err: unknown) => {
-      logger.error({ err }, 'Scanner: unhandled error during scan');
-    });
-  });
-
-  logger.info({ schedule: config.scanner.cronSchedule }, 'Scanner: scheduled');
+  logger.info({ event: 'server.started', port: PORT }, 'Server started');
+  scannerService.start();
 });
