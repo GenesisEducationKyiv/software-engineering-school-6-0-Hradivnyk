@@ -18,7 +18,6 @@ export class EmailRequestedConsumer {
 
   async start(): Promise<void> {
     if (this.started) return;
-    this.started = true;
     await this.broker.subscribe(
       QUEUE,
       EMAIL_REQUESTED,
@@ -49,5 +48,6 @@ export class EmailRequestedConsumer {
         }
       },
     );
+    this.started = true;
   }
 }

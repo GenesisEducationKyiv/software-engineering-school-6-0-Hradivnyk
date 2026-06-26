@@ -16,13 +16,19 @@ if (!cron.validate(config.scanner.cronSchedule)) {
 
 async function startApp(): Promise<void> {
   await broker.connect();
-  // Start only after the broker is connected so publishes have somewhere to go.
-  outboxRelay.start();
 
-  const server = app.listen(PORT, () => {
-    logger.info({ event: 'server.started', port: PORT }, 'Server started');
-    scannerService.start();
-  });
+  const server = await new Promise<ReturnType<typeof app.listen>>(
+    (resolve, reject) => {
+      const s = app.listen(PORT, () => {
+        logger.info({ event: 'server.started', port: PORT }, 'Server started');
+        resolve(s);
+      });
+      s.once('error', reject);
+    },
+  );
+
+  outboxRelay.start();
+  scannerService.start();
 
   function gracefulShutdown(code = 0): void {
     logger.info(

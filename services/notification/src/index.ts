@@ -15,11 +15,16 @@ async function start(): Promise<void> {
     res.end(JSON.stringify({ status: 'ok' }));
   });
 
-  healthServer.listen(config.health.port, () => {
-    logger.info(
-      { event: 'health.started', port: config.health.port },
-      'Health server started',
-    );
+  await new Promise<void>((resolve, reject) => {
+    healthServer.once('error', reject);
+    healthServer.listen(config.health.port, () => {
+      healthServer.off('error', reject);
+      logger.info(
+        { event: 'health.started', port: config.health.port },
+        'Health server started',
+      );
+      resolve();
+    });
   });
 
   logger.info({ event: 'service.started' }, 'Notification service started');
@@ -39,11 +44,14 @@ async function start(): Promise<void> {
     }, SHUTDOWN_TIMEOUT_MS);
 
     healthServer.close(() => {
-      clearTimeout(timer);
       broker
         .close()
-        .then(() => process.exit(code))
+        .then(() => {
+          clearTimeout(timer);
+          process.exit(code);
+        })
         .catch((err: unknown) => {
+          clearTimeout(timer);
           logger.error({ err }, 'Error closing broker during shutdown');
           process.exit(1);
         });

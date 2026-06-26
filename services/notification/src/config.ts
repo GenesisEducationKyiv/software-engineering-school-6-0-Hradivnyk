@@ -48,6 +48,6 @@ export const config = {
     url: optional('RABBITMQ_URL', 'amqp://localhost:5672'),
   },
   health: {
-    port: Number.parseInt(optional('HEALTH_PORT', '3002')),
+    port: optionalInt('HEALTH_PORT', 3002),
   },
 } as const;

@@ -91,7 +91,7 @@ flowchart TD
 - **GitHub API rate limit without a token:** 60 requests/hour per IP. With N unique repositories on an hourly cron schedule, the system can process at most 60 repos without `GITHUB_TOKEN`. With a token — 5,000 requests/hour.
 - **In-process scheduler:** `node-cron` runs in the same Event Loop as the HTTP server. A long scan cycle can delay HTTP request handling with a large number of repositories.
 - **No retry mechanism for GitHub requests:** transient GitHub API failures result in a missed notification until the next cron tick.
-- **No horizontal scaling:** single process + single DB instance. Running multiple instances will cause duplicate notifications (see [future work](#duplicate-notifications-under-horizontal-scaling)).
+- **No horizontal scaling:** single process + single DB instance. Running multiple instances will cause duplicate notifications (see [future work](#11-future-work)).
 - **At-least-once delivery via outbox:** the outbox relay may re-publish an event if it crashes after publishing but before marking the row as published. The notification service must tolerate duplicate `email.requested` messages.
 
 ### Business Constraints
@@ -348,7 +348,7 @@ SMTP retry policy: up to `EMAIL_RETRY_ATTEMPTS` (default: 3) attempts with initi
 
 **`app` service** — fail-fast validation on startup:
 
-```
+```env
 DATABASE_URL              → required
 RABBITMQ_URL              → optional (default: amqp://localhost:5672)
 API_KEY                   → required (enables X-API-Key auth)
@@ -363,7 +363,7 @@ OUTBOX_BATCH_SIZE         → optional (default: 50)
 
 **`notification` service** — fail-fast validation on startup:
 
-```
+```env
 RABBITMQ_URL              → optional (default: amqp://localhost:5672)
 SMTP_HOST                 → required
 SMTP_PORT                 → optional (default: 587)
@@ -629,7 +629,7 @@ Every HTTP request is logged with method, URL, status code, and response time. T
 
 **Log pipeline:**
 
-```
+```text
 Node.js (Pino JSON) → Docker log driver → Filebeat → Elasticsearch → Kibana
 ```
 

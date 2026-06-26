@@ -28,7 +28,7 @@ services:
       rabbitmq:
         condition: service_healthy # wait for the broker before consuming
     healthcheck:
-      test: ['CMD', 'curl', '-sf', 'http://localhost:3002/']
+      test: ['CMD-SHELL', 'curl -sf http://localhost:$${HEALTH_PORT}/']
       interval: 10s
       timeout: 5s
       retries: 5
