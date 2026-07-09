@@ -4,6 +4,7 @@ import type { IBroker } from './broker.interface.js';
 import type { ILogger } from '../logger/logger.interface.js';
 
 const EXCHANGE = 'release-owl.events';
+const DEAD_LETTER_EXCHANGE = 'release-owl.events.dlx';
 const MAX_RETRIES = 10;
 const INITIAL_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
@@ -14,12 +15,18 @@ type SubscriptionRecord = {
   handler: (payload: unknown) => Promise<void>;
 };
 
+async function sleepWithJitter(delay: number): Promise<void> {
+  const jittered = delay / 2 + Math.random() * (delay / 2);
+  return new Promise((resolve) => setTimeout(resolve, jittered));
+}
+
 export class RabbitMQBroker extends EventEmitter implements IBroker {
   private connection: amqplib.ChannelModel | null = null;
   private channel: amqplib.ConfirmChannel | null = null;
   private subscriptions: SubscriptionRecord[] = [];
   private isClosing = false;
   private isReconnecting = false;
+  private reconnectPromise: Promise<void> | null = null;
 
   constructor(
     private readonly url: string,
@@ -56,7 +63,7 @@ export class RabbitMQBroker extends EventEmitter implements IBroker {
           `RabbitMQ not ready, retrying ${attempt.toString()}/${MAX_RETRIES.toString()}`,
         );
         // eslint-disable-next-line no-await-in-loop -- backoff sleep between retries
-        await new Promise<void>((resolve) => setTimeout(resolve, delay));
+        await sleepWithJitter(delay);
         delay = Math.min(delay * 2, MAX_BACKOFF_MS);
       }
     }
@@ -66,6 +73,9 @@ export class RabbitMQBroker extends EventEmitter implements IBroker {
     this.connection = await amqplib.connect(this.url);
     this.channel = await this.connection.createConfirmChannel();
     await this.channel.assertExchange(EXCHANGE, 'topic', { durable: true });
+    await this.channel.assertExchange(DEAD_LETTER_EXCHANGE, 'topic', {
+      durable: true,
+    });
 
     this.connection.on('close', () => {
       if (!this.isClosing && !this.isReconnecting) {
@@ -75,7 +85,7 @@ export class RabbitMQBroker extends EventEmitter implements IBroker {
           { event: 'broker.connection_lost' },
           'RabbitMQ connection closed, reconnecting',
         );
-        void this.reconnectWithBackoff();
+        this.reconnectPromise = this.reconnectWithBackoff();
       }
     });
 
@@ -85,6 +95,8 @@ export class RabbitMQBroker extends EventEmitter implements IBroker {
         'RabbitMQ connection error',
       );
     });
+
+    if (this.isClosing) return;
 
     for (const sub of this.subscriptions) {
       // eslint-disable-next-line no-await-in-loop -- subscriptions must be re-established sequentially
@@ -117,6 +129,13 @@ export class RabbitMQBroker extends EventEmitter implements IBroker {
         try {
           // eslint-disable-next-line no-await-in-loop -- retries are inherently sequential
           await this.setupConnection();
+          if (this.isClosing) {
+            // eslint-disable-next-line no-await-in-loop -- shutdown teardown, not a retry
+            await this.channel?.close();
+            // eslint-disable-next-line no-await-in-loop -- shutdown teardown, not a retry
+            await this.connection?.close();
+            return;
+          }
           this.logger.info(
             { event: 'broker.reconnected' },
             'RabbitMQ reconnected',
@@ -129,7 +148,7 @@ export class RabbitMQBroker extends EventEmitter implements IBroker {
           );
           if (this.isClosing) return;
           // eslint-disable-next-line no-await-in-loop -- backoff sleep between retries
-          await new Promise<void>((resolve) => setTimeout(resolve, delay));
+          await sleepWithJitter(delay);
           delay = Math.min(delay * 2, MAX_BACKOFF_MS);
         }
       }
@@ -172,7 +191,22 @@ export class RabbitMQBroker extends EventEmitter implements IBroker {
 
   private async doSubscribe(record: SubscriptionRecord): Promise<void> {
     if (!this.channel) throw new Error('Broker not connected');
-    await this.channel.assertQueue(record.queue, { durable: true });
+
+    const deadLetterQueue = `${record.queue}.dlq`;
+    await this.channel.assertQueue(deadLetterQueue, { durable: true });
+    await this.channel.bindQueue(
+      deadLetterQueue,
+      DEAD_LETTER_EXCHANGE,
+      record.routingKey,
+    );
+
+    await this.channel.assertQueue(record.queue, {
+      durable: true,
+      arguments: {
+        'x-dead-letter-exchange': DEAD_LETTER_EXCHANGE,
+        'x-dead-letter-routing-key': record.routingKey,
+      },
+    });
     await this.channel.bindQueue(record.queue, EXCHANGE, record.routingKey);
     const ch = this.channel;
     // The amqplib consume callback is typed as returning void, but async handling is intentional.
@@ -195,6 +229,9 @@ export class RabbitMQBroker extends EventEmitter implements IBroker {
 
   async close(): Promise<void> {
     this.isClosing = true;
+    if (this.reconnectPromise) {
+      await this.reconnectPromise;
+    }
     await this.channel?.close();
     await this.connection?.close();
   }

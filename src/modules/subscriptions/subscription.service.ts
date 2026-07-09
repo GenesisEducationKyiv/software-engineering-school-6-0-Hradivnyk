@@ -103,6 +103,7 @@ export class SubscriptionService implements ISubscriptionService {
 
       const event: EmailRequestedPayload = {
         type: 'confirmation',
+        event_id: crypto.randomUUID(),
         email,
         repo,
         confirm_token: confirmToken,

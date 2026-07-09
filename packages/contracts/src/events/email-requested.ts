@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const ConfirmationEmailRequestedSchema = z.object({
   type: z.literal('confirmation'),
+  event_id: z.string(),
   email: z.string().email(),
   repo: z.string(),
   confirm_token: z.string(),
@@ -12,6 +13,7 @@ export const ConfirmationEmailRequestedSchema = z.object({
 
 export const NotificationEmailRequestedSchema = z.object({
   type: z.literal('notification'),
+  event_id: z.string(),
   email: z.string().email(),
   repo: z.string(),
   tag_name: z.string(),
