@@ -26,6 +26,7 @@ describe('EmailRequestedConsumer', () => {
 
     await broker.publish(EMAIL_REQUESTED, {
       type: 'confirmation',
+      event_id: 'evt-1',
       email: 'a@b.com',
       repo: 'owner/repo',
       confirm_token: 'tok',
@@ -46,6 +47,7 @@ describe('EmailRequestedConsumer', () => {
 
     await broker.publish(EMAIL_REQUESTED, {
       type: 'notification',
+      event_id: 'evt-2',
       email: 'a@b.com',
       repo: 'owner/repo',
       tag_name: 'v1',
@@ -122,10 +124,30 @@ describe('EmailRequestedConsumer', () => {
 
     await broker.publish(EMAIL_REQUESTED, {
       type: 'confirmation',
+      event_id: 'evt-3',
       email: 'a@b.com',
       repo: 'owner/repo',
       confirm_token: 'tok',
     });
+
+    expect(notifier.sendConfirmationEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips a duplicate event without sending a second email', async () => {
+    const broker = new InMemoryBroker();
+    const notifier = fakeNotifier();
+    await new EmailRequestedConsumer(broker, notifier, noopLogger).start();
+
+    const payload = {
+      type: 'confirmation' as const,
+      event_id: 'evt-dup',
+      email: 'a@b.com',
+      repo: 'owner/repo',
+      confirm_token: 'tok',
+    };
+
+    await broker.publish(EMAIL_REQUESTED, payload);
+    await broker.publish(EMAIL_REQUESTED, payload);
 
     expect(notifier.sendConfirmationEmail).toHaveBeenCalledTimes(1);
   });
@@ -141,6 +163,7 @@ describe('EmailRequestedConsumer', () => {
     await expect(
       broker.publish(EMAIL_REQUESTED, {
         type: 'notification',
+        event_id: 'evt-4',
         email: 'a@b.com',
         repo: 'owner/repo',
         tag_name: 'v1',

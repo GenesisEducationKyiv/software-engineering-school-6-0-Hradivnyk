@@ -98,6 +98,7 @@ describe('SubscriptionService', () => {
         EMAIL_REQUESTED,
         {
           type: 'confirmation',
+          event_id: expect.any(String),
           email: EMAIL,
           repo: REPO,
           confirm_token: confirmToken,
