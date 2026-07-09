@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction, Express } from 'express';
 import type { Notifier } from './email.service.js';
 import type { ILogger } from './logger.js';
 import { EmailRequestedPayloadSchema } from '@release-owl/contracts';
+import { EmailSendError } from './errors.js';
 
 /**
  * Builds the notification HTTP service. The single `/api/notify` endpoint is the
@@ -58,17 +59,25 @@ export function createApp(notifier: Notifier, logger: ILogger): Express {
         );
       }
 
-      res.status(202).json({ status: 'sent' });
+      res.status(200).json({ status: 'sent' });
     },
   );
 
   app.use(
     (err: unknown, _req: Request, res: Response, _next: NextFunction): void => {
+      if (err instanceof EmailSendError) {
+        logger.error(
+          { event: 'notify.email_send_failed', err },
+          'Email send failed',
+        );
+        res.status(502).json({ error: 'email_send_failed' });
+        return;
+      }
       logger.error(
         { event: 'notify.request_failed', err },
         'Notification request failed',
       );
-      res.status(502).json({ error: 'email_send_failed' });
+      res.status(500).json({ error: 'internal_error' });
     },
   );
 

@@ -13,7 +13,7 @@ import logger from './platform/logger.js';
 import { pinoHttp } from 'pino-http';
 import { requestContext } from './utils/requestContext.js';
 import { config } from './platform/config/index.js';
-import { subscriptionRoutes } from './modules/subscriptions/index.js';
+import subscriptionRoutes from './modules/subscriptions/subscription.routes.js';
 import { errorHandler } from './platform/http/error-handler.js';
 import { metricsMiddleware } from './platform/http/metricsMiddleware.js';
 import { register } from './metrics/index.js';

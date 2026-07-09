@@ -1,5 +1,6 @@
 import type { IEmailSender } from './email.sender.js';
 import type { IEmailTemplateBuilder } from './email-template.builder.js';
+import { EmailSendError } from './errors.js';
 
 export interface Notifier {
   sendConfirmationEmail(
@@ -26,9 +27,7 @@ export class EmailService implements Notifier {
     token: string,
     repo: string,
   ): Promise<void> {
-    await this.sender.send(
-      this.templates.confirmationEmail(email, token, repo),
-    );
+    await this.send(this.templates.confirmationEmail(email, token, repo));
   }
 
   async sendNotificationEmail(
@@ -37,8 +36,16 @@ export class EmailService implements Notifier {
     tag: string,
     token: string,
   ): Promise<void> {
-    await this.sender.send(
-      this.templates.notificationEmail(email, repo, tag, token),
-    );
+    await this.send(this.templates.notificationEmail(email, repo, tag, token));
+  }
+
+  private async send(
+    options: Parameters<IEmailSender['send']>[0],
+  ): Promise<void> {
+    try {
+      await this.sender.send(options);
+    } catch (err) {
+      throw new EmailSendError(err);
+    }
   }
 }

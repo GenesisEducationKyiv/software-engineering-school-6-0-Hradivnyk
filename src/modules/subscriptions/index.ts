@@ -1,9 +1,12 @@
 export { SubscriptionController } from './subscription.controller.js';
 export { SubscriptionService } from './subscription.service.js';
-export { SubscriptionModel } from './subscription.model.js';
 export type { ISubscriptionModel } from './subscription.model.js';
-export { RepositoryModel } from './repository.model.js';
 export type { IRepositoryModel } from './repository.model.js';
+export { createSubscriptionModule } from './subscription.module.js';
+export type {
+  SubscriptionModule,
+  SubscriptionModuleDeps,
+} from './subscription.module.js';
 export type {
   Subscription,
   ISubscriptionService,
@@ -16,4 +19,3 @@ export {
   TokenNotFoundError,
   InvalidTokenError,
 } from './subscription.errors.js';
-export { default as subscriptionRoutes } from './subscription.routes.js';

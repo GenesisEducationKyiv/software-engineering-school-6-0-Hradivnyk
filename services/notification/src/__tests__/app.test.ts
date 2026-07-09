@@ -2,6 +2,7 @@ import request from 'supertest';
 import { createApp } from '../app.js';
 import type { Notifier } from '../email.service.js';
 import type { ILogger } from '../logger.js';
+import { EmailSendError } from '../errors.js';
 
 const noopLogger: ILogger = {
   info: () => undefined,
@@ -88,9 +89,11 @@ describe('notification HTTP service', () => {
     expect(notifier.sendNotificationEmail).not.toHaveBeenCalled();
   });
 
-  it('returns 502 when the notifier fails', async () => {
+  it('returns 502 when email sending fails', async () => {
     const { app } = build({
-      sendConfirmationEmail: jest.fn().mockRejectedValue(new Error('smtp')),
+      sendConfirmationEmail: jest
+        .fn()
+        .mockRejectedValue(new EmailSendError(new Error('smtp'))),
     });
     const res = await request(app).post('/api/notify').send({
       type: 'confirmation',
@@ -100,5 +103,21 @@ describe('notification HTTP service', () => {
     });
 
     expect(res.status).toBe(502);
+    expect(res.body).toEqual({ error: 'email_send_failed' });
+  });
+
+  it('returns 500 on an unexpected error', async () => {
+    const { app } = build({
+      sendConfirmationEmail: jest.fn().mockRejectedValue(new TypeError('boom')),
+    });
+    const res = await request(app).post('/api/notify').send({
+      type: 'confirmation',
+      email: 'a@b.com',
+      repo: 'owner/repo',
+      confirm_token: 'tok',
+    });
+
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'internal_error' });
   });
 });

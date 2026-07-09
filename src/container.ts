@@ -3,10 +3,7 @@ import { config } from './platform/config/index.js';
 import logger from './platform/logger.js';
 import { GithubService, FetchHttpClient } from './modules/github/index.js';
 import { NotificationHttpClient } from './modules/notifications/index.js';
-import { SubscriptionModel } from './modules/subscriptions/subscription.model.js';
-import { RepositoryModel } from './modules/subscriptions/repository.model.js';
-import { SubscriptionService } from './modules/subscriptions/subscription.service.js';
-import { SubscriptionController } from './modules/subscriptions/subscription.controller.js';
+import { createSubscriptionModule } from './modules/subscriptions/index.js';
 import {
   ScannerService,
   InProcessReleaseHandler,
@@ -25,20 +22,10 @@ const notifier = new NotificationHttpClient(
   logger,
 );
 
-const repositoryModel = new RepositoryModel(knex);
-const subscriptionModel = new SubscriptionModel(knex, repositoryModel);
+const { subscriptionModel, repositoryModel, subscriptionController } =
+  createSubscriptionModule(knex, { notifier, githubService });
 
-const subscriptionService = new SubscriptionService(
-  subscriptionModel,
-  notifier,
-  githubService,
-);
-
-export { subscriptionModel, repositoryModel };
-
-export const subscriptionController = new SubscriptionController(
-  subscriptionService,
-);
+export { subscriptionController };
 
 const releaseHandler = new InProcessReleaseHandler(
   notifier,

@@ -8,11 +8,20 @@ const optional = (key: string, defaultValue: string): string => {
   return process.env[key] ?? defaultValue;
 };
 
+const optionalInt = (key: string, defaultValue: number): number => {
+  const raw = process.env[key];
+  if (raw === undefined) return defaultValue;
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed))
+    throw new Error(`Env variable ${key} must be an integer, got: "${raw}"`);
+  return parsed;
+};
+
 const nodeEnv = optional('NODE_ENV', 'development');
 
 export const config = {
   server: {
-    port: Number.parseInt(optional('PORT', '3000')),
+    port: optionalInt('PORT', 3000),
     nodeEnv,
     isDev: nodeEnv === 'development',
     isProd: nodeEnv === 'production',
@@ -34,7 +43,7 @@ export const config = {
   },
   notification: {
     url: optional('NOTIFICATION_SERVICE_URL', 'http://localhost:4000'),
-    timeoutMs: Number.parseInt(optional('NOTIFICATION_TIMEOUT_MS', '5000')),
+    timeoutMs: optionalInt('NOTIFICATION_TIMEOUT_MS', 5000),
   },
   app: {
     baseUrl: optional('BASE_URL', 'http://localhost:3000'),
