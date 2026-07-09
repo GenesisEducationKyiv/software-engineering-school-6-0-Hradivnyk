@@ -29,6 +29,7 @@ describe('BrokerNotifier', () => {
     expect(received).toEqual([
       {
         type: 'confirmation',
+        event_id: expect.any(String),
         email: 'a@b.com',
         repo: 'owner/repo',
         confirm_token: 'tok',
@@ -45,6 +46,7 @@ describe('BrokerNotifier', () => {
     expect(received).toEqual([
       {
         type: 'notification',
+        event_id: expect.any(String),
         email: 'a@b.com',
         repo: 'owner/repo',
         tag_name: 'v1',

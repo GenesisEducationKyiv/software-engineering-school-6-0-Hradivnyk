@@ -10,9 +10,20 @@ import {
   scannerReleasesDetectedTotal,
 } from '../../metrics/index.js';
 
-/** Reacts to a newly detected release. The in-process implementation notifies
- *  subscribers and records the tag; in a later phase this seam is replaced by
- *  publishing a `release.detected` event. */
+/** Reacts to a newly detected release. The in-process implementation records
+ *  the tag best-effort (before sending) and notifies subscribers, so a failed
+ *  send to one subscriber doesn't re-notify everyone else on the next scan;
+ *  in a later phase this seam is replaced by publishing a `release.detected`
+ *  event.
+ *
+ *  Unlike the subscribe flow, this path does NOT go through the outbox: the
+ *  tag update and the notification sends are two separate, non-atomic steps,
+ *  and `notifier.sendNotificationEmail` publishes to the broker directly
+ *  (best-effort, no retry). A broker blip during a scan drops that
+ *  subscriber's notification with no redelivery — accepted for now since
+ *  the next scan still detects and reports future releases, and wiring
+ *  per-subscriber outbox rows here is deferred to the `release.detected`
+ *  event migration mentioned above. */
 export interface ReleaseHandler {
   handle(
     repo: string,
@@ -35,6 +46,8 @@ export class InProcessReleaseHandler implements ReleaseHandler {
   ): Promise<void> {
     scannerReleasesDetectedTotal.inc({ repo });
 
+    await this.repositoryModel.updateLastSeenTag(repo, release.tag_name);
+
     const results = await Promise.allSettled(
       subscribers.map(async (sub) =>
         this.notifier
@@ -50,18 +63,13 @@ export class InProcessReleaseHandler implements ReleaseHandler {
       ),
     );
 
-    const failures = results.filter(
-      (r): r is PromiseRejectedResult => r.status === 'rejected',
-    );
-    for (const failure of failures) {
-      this.logger.error(
-        { err: failure.reason as unknown, repo },
-        'ReleaseHandler: failed to send notification email',
-      );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.error(
+          { err: result.reason as unknown, repo },
+          'ReleaseHandler: failed to send notification email',
+        );
+      }
     }
-
-    if (failures.length > 0) return;
-
-    await this.repositoryModel.updateLastSeenTag(repo, release.tag_name);
   }
 }

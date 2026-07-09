@@ -46,31 +46,36 @@ export class EmailRequestedConsumer {
 
   async start(): Promise<void> {
     if (this.started) return;
-    await this.broker.subscribe(
-      QUEUE,
-      EMAIL_REQUESTED,
-      async (raw): Promise<void> => {
-        if (this.stopping) return;
-        const payload = EmailRequestedPayloadSchema.parse(raw);
-
-        if (payload.type === 'confirmation') {
-          await this.handleConfirmation(payload);
-        } else {
-          // Release notification: fire-and-forget, no saga
-          await this.notifier.sendNotificationEmail(
-            payload.email,
-            payload.repo,
-            payload.tag_name,
-            payload.unsubscribe_token,
-          );
-          this.logger.info(
-            { event: 'email.notification_sent', repo: payload.repo },
-            'Notification email sent',
-          );
-        }
-      },
-    );
     this.started = true;
+    try {
+      await this.broker.subscribe(
+        QUEUE,
+        EMAIL_REQUESTED,
+        async (raw): Promise<void> => {
+          if (this.stopping) return;
+          const payload = EmailRequestedPayloadSchema.parse(raw);
+
+          if (payload.type === 'confirmation') {
+            await this.handleConfirmation(payload);
+          } else {
+            // Release notification: fire-and-forget, no saga
+            await this.notifier.sendNotificationEmail(
+              payload.email,
+              payload.repo,
+              payload.tag_name,
+              payload.unsubscribe_token,
+            );
+            this.logger.info(
+              { event: 'email.notification_sent', repo: payload.repo },
+              'Notification email sent',
+            );
+          }
+        },
+      );
+    } catch (err) {
+      this.started = false;
+      throw err;
+    }
   }
 
   private async handleConfirmation(

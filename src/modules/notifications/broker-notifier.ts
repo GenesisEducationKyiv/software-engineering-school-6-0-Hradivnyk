@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type { IBroker } from '@release-owl/platform';
 import { EMAIL_REQUESTED } from '@release-owl/contracts';
 import type { Notifier } from './notifier.js';
@@ -17,6 +18,7 @@ export class BrokerNotifier implements Notifier {
   ): Promise<void> {
     await this.broker.publish(EMAIL_REQUESTED, {
       type: 'confirmation',
+      event_id: crypto.randomUUID(),
       email,
       repo,
       confirm_token: token,
@@ -31,6 +33,7 @@ export class BrokerNotifier implements Notifier {
   ): Promise<void> {
     await this.broker.publish(EMAIL_REQUESTED, {
       type: 'notification',
+      event_id: crypto.randomUUID(),
       email,
       repo,
       tag_name: tag,

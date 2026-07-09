@@ -86,6 +86,7 @@ describe('EmailRequestedConsumer — confirmation (saga)', () => {
     await buildConsumer(broker, notifier, inbox, outbox, uow).start();
     await broker.publish(EMAIL_REQUESTED, {
       type: 'confirmation',
+      event_id: 'evt-1',
       email: 'a@b.com',
       repo: 'owner/repo',
       confirm_token: 'tok',
@@ -117,6 +118,7 @@ describe('EmailRequestedConsumer — confirmation (saga)', () => {
     // Should NOT throw: failure is handled by enqueuing email.failed
     await broker.publish(EMAIL_REQUESTED, {
       type: 'confirmation',
+      event_id: 'evt-2',
       email: 'a@b.com',
       repo: 'owner/repo',
       confirm_token: 'tok',
@@ -147,6 +149,7 @@ describe('EmailRequestedConsumer — confirmation (saga)', () => {
     await buildConsumer(broker, notifier, inbox, outbox, uow).start();
     await broker.publish(EMAIL_REQUESTED, {
       type: 'confirmation',
+      event_id: 'evt-3',
       email: 'a@b.com',
       repo: 'owner/repo',
       confirm_token: 'tok',
@@ -172,6 +175,7 @@ describe('EmailRequestedConsumer — confirmation (saga)', () => {
     await buildConsumer(broker, notifier, inbox, outbox, uow).start();
     await broker.publish(EMAIL_REQUESTED, {
       type: 'confirmation',
+      event_id: 'evt-4',
       email: 'a@b.com',
       repo: 'owner/repo',
       confirm_token: 'tok',
@@ -197,6 +201,7 @@ describe('EmailRequestedConsumer — confirmation (saga)', () => {
     await buildConsumer(broker, notifier, inbox, outbox, uow).start();
     await broker.publish(EMAIL_REQUESTED, {
       type: 'confirmation',
+      event_id: 'evt-5',
       email: 'a@b.com',
       repo: 'owner/repo',
       confirm_token: 'tok',
@@ -227,6 +232,7 @@ describe('EmailRequestedConsumer — notification (fire-and-forget)', () => {
     await buildConsumer(broker, notifier, inbox, outbox, uow).start();
     await broker.publish(EMAIL_REQUESTED, {
       type: 'notification',
+      event_id: 'evt-6',
       email: 'a@b.com',
       repo: 'owner/repo',
       tag_name: 'v1',
@@ -257,6 +263,7 @@ describe('EmailRequestedConsumer — notification (fire-and-forget)', () => {
     await expect(
       broker.publish(EMAIL_REQUESTED, {
         type: 'notification',
+        event_id: 'evt-7',
         email: 'a@b.com',
         repo: 'owner/repo',
         tag_name: 'v1',
@@ -283,6 +290,7 @@ describe('EmailRequestedConsumer — schema validation', () => {
     await expect(
       broker.publish(EMAIL_REQUESTED, {
         type: 'confirmation',
+        event_id: 'evt-8',
         email: 'a@b.com',
         repo: 'owner/repo',
         confirm_token: 'tok',
@@ -324,6 +332,7 @@ describe('EmailRequestedConsumer — schema validation', () => {
 
     await broker.publish(EMAIL_REQUESTED, {
       type: 'notification',
+      event_id: 'evt-9',
       email: 'a@b.com',
       repo: 'owner/repo',
       tag_name: 'v1',

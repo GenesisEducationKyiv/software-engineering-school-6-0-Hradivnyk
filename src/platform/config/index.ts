@@ -8,6 +8,15 @@ const optional = (key: string, defaultValue: string): string => {
   return process.env[key] ?? defaultValue;
 };
 
+const optionalInt = (key: string, defaultValue: number): number => {
+  const raw = process.env[key];
+  if (raw === undefined) return defaultValue;
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed))
+    throw new Error(`Env variable ${key} must be an integer, got: "${raw}"`);
+  return parsed;
+};
+
 const positiveInt = (key: string, defaultValue: number): number => {
   const raw = process.env[key];
   const value = raw !== undefined ? Number.parseInt(raw, 10) : defaultValue;
@@ -23,7 +32,7 @@ const nodeEnv = optional('NODE_ENV', 'development');
 
 export const config = {
   server: {
-    port: Number.parseInt(optional('PORT', '3000')),
+    port: optionalInt('PORT', 3000),
     nodeEnv,
     isDev: nodeEnv === 'development',
     isProd: nodeEnv === 'production',

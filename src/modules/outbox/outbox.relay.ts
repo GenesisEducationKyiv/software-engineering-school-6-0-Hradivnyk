@@ -13,6 +13,14 @@ export interface OutboxRelayConfig {
  * inside one transaction holding a row lock (SELECT ... FOR UPDATE SKIP LOCKED),
  * so multiple instances never publish the same event, and any publish failure
  * rolls the batch back to be retried on the next tick (at-least-once delivery).
+ *
+ * This means the row lock spans the network I/O of publishing to the broker.
+ * Fine with SKIP LOCKED and a single relay instance; under higher load or with
+ * multiple relays it would lengthen transactions and hold DB connections
+ * longer than necessary. Publishing outside the transaction (mark-published in
+ * a short second transaction) would shorten lock hold time but widen the
+ * duplicate-delivery window on crash — no net change, since consumers must
+ * already be idempotent for at-least-once delivery.
  */
 export class OutboxRelay {
   private timer: NodeJS.Timeout | null = null;
