@@ -59,7 +59,7 @@ export function createApp(notifier: Notifier, logger: ILogger): Express {
         );
       }
 
-      res.status(200).json({ status: 'sent' });
+      res.status(202).json({ status: 'sent' });
     },
   );
 
