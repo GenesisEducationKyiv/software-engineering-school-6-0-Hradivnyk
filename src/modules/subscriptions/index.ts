@@ -1,0 +1,21 @@
+export { SubscriptionController } from './subscription.controller.js';
+export { SubscriptionService } from './subscription.service.js';
+export type { ISubscriptionModel } from './subscription.model.js';
+export type { IRepositoryModel } from './repository.model.js';
+export { createSubscriptionModule } from './subscription.module.js';
+export type {
+  SubscriptionModule,
+  SubscriptionModuleDeps,
+} from './subscription.module.js';
+export type {
+  Subscription,
+  ISubscriptionService,
+  ConfirmedSubscriptionWithToken,
+  ConfirmedSubscriptionsProvider,
+} from './subscription.types.js';
+export {
+  RepositoryNotFoundError,
+  DuplicateSubscriptionError,
+  TokenNotFoundError,
+  InvalidTokenError,
+} from './subscription.errors.js';

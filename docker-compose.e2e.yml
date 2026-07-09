@@ -9,29 +9,49 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://test:test@db:5432/test_db
+      BASE_URL: http://localhost:3000
+      ALLOWED_ORIGIN: '*'
+      API_KEY: test-api-key
+      SCANNER_CRON_SCHEDULE: '0 * * * *'
+      NOTIFICATION_SERVICE_URL: http://notification:4000
+      # Point to the in-network mock instead of the real GitHub API so that
+      # E2E tests exercise the full internal stack without an external dependency.
+      GITHUB_API_URL: http://github-mock:3001
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/health || exit 1']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    depends_on:
+      db:
+        condition: service_healthy
+      notification:
+        condition: service_healthy
+      github-mock:
+        condition: service_started
+
+  notification:
+    build:
+      context: .
+      dockerfile: services/notification/Dockerfile
+    environment:
+      NODE_ENV: production
+      NOTIFICATION_PORT: 4000
       SMTP_HOST: mailhog
       SMTP_PORT: '1025'
       SMTP_USER: test@example.com
       SMTP_PASS: test
       SMTP_FROM: noreply@test.example.com
       BASE_URL: http://localhost:3000
-      ALLOWED_ORIGIN: '*'
-      API_KEY: test-api-key
-      SCANNER_CRON_SCHEDULE: '0 * * * *'
-      # Point to the in-network mock instead of the real GitHub API so that
-      # E2E tests exercise the full internal stack without an external dependency.
-      GITHUB_API_URL: http://github-mock:3001
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO /dev/null http://localhost:3000/']
-      interval: 2s
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:4000/health || exit 1']
+      interval: 5s
       timeout: 5s
-      retries: 30
-      start_period: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
-      db:
-        condition: service_healthy
-      github-mock:
-        condition: service_started
+      - mailhog
 
   # Minimal GitHub API mock: returns HTTP 200 + JSON for any request,
   # which is enough for githubService.repositoryExists() to return true.

@@ -1,49 +1,41 @@
-import knex from './db/knex.js';
-import { RepositoryModel } from './models/repositoryModel.js';
-import { SubscriptionModel } from './models/subscriptionModel.js';
-import { EmailService } from './services/emailService.js';
-import { NodemailerEmailSender } from './services/emailSender.js';
-import { EmailTemplateBuilder } from './services/emailTemplateBuilder.js';
-import { GithubService } from './services/githubService.js';
-import { FetchHttpClient } from './httpClient.js';
-import { SubscriptionService } from './services/subscriptionService.js';
-import { ScannerService } from './services/scannerService.js';
-import { SubscriptionController } from './controllers/subscriptionController.js';
-import { config } from './config/index.js';
-import logger from './utils/logger.js';
+import knex from './platform/db/knex.js';
+import { config } from './platform/config/index.js';
+import logger from './platform/logger.js';
+import { GithubService, FetchHttpClient } from './modules/github/index.js';
+import { NotificationHttpClient } from './modules/notifications/index.js';
+import { createSubscriptionModule } from './modules/subscriptions/index.js';
+import {
+  ScannerService,
+  InProcessReleaseHandler,
+} from './modules/releases/index.js';
 
-const repositoryModel = new RepositoryModel(knex);
-const subscriptionModel = new SubscriptionModel(knex, repositoryModel);
-const emailSender = new NodemailerEmailSender({
-  host: config.email.host,
-  port: config.email.port,
-  user: config.email.user,
-  pass: config.email.pass,
-  from: config.email.from,
-});
-const emailTemplates = new EmailTemplateBuilder(config.app.baseUrl);
-const emailService = new EmailService(emailSender, emailTemplates);
 const githubService = new GithubService(
   new FetchHttpClient(),
   config.github.token,
 );
 
-const subscriptionService = new SubscriptionService(
-  subscriptionModel,
-  emailService,
-  githubService,
-);
-
-export { subscriptionModel, repositoryModel };
-
-export const scannerService = new ScannerService(
-  subscriptionModel,
-  repositoryModel,
-  emailService,
-  githubService,
+const notifier = new NotificationHttpClient(
+  {
+    baseUrl: config.notification.url,
+    timeoutMs: config.notification.timeoutMs,
+  },
   logger,
 );
 
-export const subscriptionController = new SubscriptionController(
-  subscriptionService,
+const { subscriptionModel, repositoryModel, subscriptionController } =
+  createSubscriptionModule(knex, { notifier, githubService });
+
+export { subscriptionModel, repositoryModel, subscriptionController };
+
+const releaseHandler = new InProcessReleaseHandler(
+  notifier,
+  repositoryModel,
+  logger,
+);
+
+export const scannerService = new ScannerService(
+  subscriptionModel,
+  githubService,
+  releaseHandler,
+  logger,
 );

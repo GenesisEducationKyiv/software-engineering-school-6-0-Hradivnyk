@@ -1,15 +1,15 @@
 import request from 'supertest';
 import app from '../../src/app.js';
-import knex from '../../src/db/knex.js';
-import { GithubService } from '../../src/services/githubService.js';
-import { EmailService } from '../../src/services/emailService.js';
+import knex from '../../src/platform/db/knex.js';
+import { GithubService } from '../../src/modules/github/github.service.js';
+import { NotificationHttpClient } from '../../src/modules/notifications/notification.client.js';
 import { subscriptionModel, repositoryModel } from '../../src/container.js';
 
-jest.mock('../../src/services/githubService.js');
-jest.mock('../../src/services/emailService.js');
+jest.mock('../../src/modules/github/github.service.js');
+jest.mock('../../src/modules/notifications/notification.client.js');
 
 const mockedGithub = jest.mocked(GithubService).prototype;
-const mockedEmail = jest.mocked(EmailService).prototype;
+const mockedEmail = jest.mocked(NotificationHttpClient).prototype;
 
 const EMAIL = 'integration@example.com';
 const REPO = 'owner/repo';
@@ -129,8 +129,26 @@ describe('POST /api/subscribe', () => {
     expect(res.body).toHaveProperty('error');
   });
 
-  it('returns 409 and keeps only one subscription on duplicate', async () => {
+  it('resends the confirmation and keeps one row when re-subscribing while pending', async () => {
     await subscribe();
+    const res = await subscribe();
+
+    expect(res.status).toBe(200);
+    expect(mockedEmail.sendConfirmationEmail).toHaveBeenCalledTimes(2);
+
+    const rows = await knex('subscriptions').where({
+      email: EMAIL,
+      repo: REPO,
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('pending');
+  });
+
+  it('returns 409 and keeps one row when re-subscribing to a confirmed subscription', async () => {
+    await subscribe();
+    const { confirmToken } = await getTokens();
+    await request(app).get(`/api/confirm/${confirmToken}`);
+
     const res = await subscribe();
 
     expect(res.status).toBe(409);

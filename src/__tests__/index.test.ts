@@ -13,11 +13,11 @@ jest.mock('../app.js', () => ({
 jest.mock('../container.js', () => ({
   scannerService: { scan: jest.fn(), start: jest.fn() },
 }));
-jest.mock('../utils/logger.js', () => ({
+jest.mock('../platform/logger.js', () => ({
   __esModule: true,
   default: { info: jest.fn(), error: jest.fn() },
 }));
-jest.mock('../config/index.js', () => ({
+jest.mock('../platform/config/index.js', () => ({
   config: {
     scanner: { cronSchedule: '30 6 * * *' },
   },

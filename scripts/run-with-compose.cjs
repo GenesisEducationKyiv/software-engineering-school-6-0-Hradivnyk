@@ -82,7 +82,7 @@ try {
 //    can start an app that never becomes healthy (e.g. one that blocks on a
 //    broker absent from this stack). Layer caching keeps no-op rebuilds fast.
 try {
-  run(`${compose} up -d --wait --build`);
+  run(`${compose} up -d --build --wait`);
 } catch (err) {
   try {
     run(`${compose} down -v`);

@@ -9,18 +9,22 @@ import type { JsonObject } from 'swagger-ui-express';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import logger from './utils/logger.js';
+import logger from './platform/logger.js';
 import { pinoHttp } from 'pino-http';
 import { requestContext } from './utils/requestContext.js';
-import { config } from './config/index.js';
-import subscriptionRoutes from './routes/subscriptionRoutes.js';
-import { errorHandler } from './middleware/errorHandler.js';
-import { metricsMiddleware } from './middleware/metricsMiddleware.js';
+import { config } from './platform/config/index.js';
+import subscriptionRoutes from './modules/subscriptions/subscription.routes.js';
+import { errorHandler } from './platform/http/error-handler.js';
+import { metricsMiddleware } from './platform/http/metricsMiddleware.js';
 import { register } from './metrics/index.js';
 
 const app = express();
 
 app.use(express.static(resolve(process.cwd(), 'public')));
+
+app.get('/health', (_req, res) => {
+  res.sendStatus(200);
+});
 
 app.use(metricsMiddleware);
 
