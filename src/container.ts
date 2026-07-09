@@ -25,7 +25,7 @@ const notifier = new NotificationHttpClient(
 const { subscriptionModel, repositoryModel, subscriptionController } =
   createSubscriptionModule(knex, { notifier, githubService });
 
-export { subscriptionController };
+export { subscriptionModel, repositoryModel, subscriptionController };
 
 const releaseHandler = new InProcessReleaseHandler(
   notifier,
