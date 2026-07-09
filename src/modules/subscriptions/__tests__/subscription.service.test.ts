@@ -4,8 +4,10 @@ import {
   RepositoryNotFoundError,
   TokenNotFoundError,
 } from '../subscription.errors.js';
+import type { Knex } from 'knex';
+import { EMAIL_REQUESTED } from '@release-owl/contracts';
 import type { ISubscriptionModel } from '../subscription.model.js';
-import type { Notifier } from '../../notifications/index.js';
+import type { IOutboxModel } from '../../outbox/index.js';
 import type { IGithubService } from '../../github/index.js';
 import { SubscriptionService } from '../subscription.service.js';
 
@@ -16,7 +18,8 @@ const REPO = 'owner/repo';
 describe('SubscriptionService', () => {
   let service: SubscriptionService;
   let mockModel: jest.Mocked<ISubscriptionModel>;
-  let mockNotifier: jest.Mocked<Notifier>;
+  let mockOutbox: jest.Mocked<IOutboxModel>;
+  let mockUow: { run: jest.Mock };
   let mockGithubService: jest.Mocked<IGithubService>;
 
   beforeEach(() => {
@@ -28,9 +31,16 @@ describe('SubscriptionService', () => {
       findAllConfirmedWithTokens: jest.fn(),
       findByEmail: jest.fn(),
     };
-    mockNotifier = {
-      sendConfirmationEmail: jest.fn(),
-      sendNotificationEmail: jest.fn(),
+    mockOutbox = {
+      enqueue: jest.fn(),
+      claimUnpublished: jest.fn(),
+      markPublished: jest.fn(),
+    };
+    // Runs the unit of work inline against a throwaway transaction stub.
+    mockUow = {
+      run: jest.fn(async (work: (trx: Knex.Transaction) => Promise<unknown>) =>
+        work({} as Knex.Transaction),
+      ),
     };
     mockGithubService = {
       repositoryExists: jest.fn(),
@@ -38,8 +48,9 @@ describe('SubscriptionService', () => {
     };
     service = new SubscriptionService(
       mockModel,
-      mockNotifier,
+      mockOutbox,
       mockGithubService,
+      mockUow,
     );
   });
 
@@ -48,7 +59,7 @@ describe('SubscriptionService', () => {
       mockGithubService.repositoryExists.mockResolvedValue(true);
       mockModel.hasConfirmedSubscription.mockResolvedValue(false);
       mockModel.create.mockResolvedValue(undefined);
-      mockNotifier.sendConfirmationEmail.mockResolvedValue(undefined);
+      mockOutbox.enqueue.mockResolvedValue(undefined);
     });
 
     it('should validate that the repository exists via githubService', async () => {
@@ -65,6 +76,7 @@ describe('SubscriptionService', () => {
         REPO,
         expect.stringMatching(/^[0-9a-f]{64}$/),
         expect.stringMatching(/^[0-9a-f]{64}$/),
+        expect.anything(),
       );
     });
 
@@ -78,15 +90,29 @@ describe('SubscriptionService', () => {
       expect(confirmToken).not.toBe(unsubscribeToken);
     });
 
-    it('should call notifier to send a confirmation email', async () => {
+    it('should enqueue an email.requested event for the confirmation email', async () => {
       await service.subscribe(EMAIL, REPO);
 
       const [, , confirmToken] = mockModel.create.mock.calls[0];
-      expect(mockNotifier.sendConfirmationEmail).toHaveBeenCalledWith(
-        EMAIL,
-        confirmToken,
-        REPO,
+      expect(mockOutbox.enqueue).toHaveBeenCalledWith(
+        EMAIL_REQUESTED,
+        {
+          type: 'confirmation',
+          event_id: expect.any(String),
+          email: EMAIL,
+          repo: REPO,
+          confirm_token: confirmToken,
+        },
+        expect.anything(),
       );
+    });
+
+    it('should write the subscription and the event in a single unit of work', async () => {
+      await service.subscribe(EMAIL, REPO);
+
+      expect(mockUow.run).toHaveBeenCalledTimes(1);
+      expect(mockModel.create).toHaveBeenCalledTimes(1);
+      expect(mockOutbox.enqueue).toHaveBeenCalledTimes(1);
     });
 
     it('should throw RepositoryNotFoundError if githubService returns not found', async () => {
@@ -103,26 +129,6 @@ describe('SubscriptionService', () => {
       await expect(service.subscribe(EMAIL, REPO)).rejects.toThrow(
         DuplicateSubscriptionError,
       );
-    });
-
-    it('should persist the subscription before sending the confirmation email', async () => {
-      await service.subscribe(EMAIL, REPO);
-
-      const createOrder = mockModel.create.mock.invocationCallOrder[0];
-      const sendOrder =
-        mockNotifier.sendConfirmationEmail.mock.invocationCallOrder[0];
-      expect(createOrder).toBeLessThan(sendOrder);
-    });
-
-    it('should keep the persisted subscription even if sending the confirmation email fails', async () => {
-      mockNotifier.sendConfirmationEmail.mockRejectedValue(
-        new Error('notification timeout'),
-      );
-
-      await expect(service.subscribe(EMAIL, REPO)).rejects.toThrow(
-        'notification timeout',
-      );
-      expect(mockModel.create).toHaveBeenCalled();
     });
   });
 

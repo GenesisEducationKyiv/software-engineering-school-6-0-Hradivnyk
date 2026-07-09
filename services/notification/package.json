@@ -10,16 +10,13 @@
   },
   "dependencies": {
     "@release-owl/contracts": "*",
+    "@release-owl/platform": "*",
     "dotenv": "*",
-    "express": "*",
     "nodemailer": "*",
     "pino": "*",
-    "pino-http": "*",
-    "pino-pretty": "*",
-    "zod": "*"
+    "pino-pretty": "*"
   },
   "devDependencies": {
-    "@types/express": "*",
     "@types/node": "*",
     "@types/nodemailer": "*",
     "tsx": "*"

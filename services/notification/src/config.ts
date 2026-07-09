@@ -39,9 +39,6 @@ export const config = {
         ? 'debug'
         : 'info',
   ),
-  server: {
-    port: optionalInt('NOTIFICATION_PORT', 4000),
-  },
   email: {
     host: required('SMTP_HOST'),
     port: optionalInt('SMTP_PORT', 587),
@@ -55,5 +52,11 @@ export const config = {
   retry: {
     attempts: optionalPositiveInt('EMAIL_RETRY_ATTEMPTS', 3),
     backoffMs: optionalInt('EMAIL_RETRY_BACKOFF_MS', 500),
+  },
+  rabbitmq: {
+    url: optional('RABBITMQ_URL', 'amqp://localhost:5672'),
+  },
+  health: {
+    port: optionalInt('HEALTH_PORT', 3002),
   },
 } as const;

@@ -14,7 +14,16 @@ import {
  *  the tag best-effort (before sending) and notifies subscribers, so a failed
  *  send to one subscriber doesn't re-notify everyone else on the next scan;
  *  in a later phase this seam is replaced by publishing a `release.detected`
- *  event. */
+ *  event.
+ *
+ *  Unlike the subscribe flow, this path does NOT go through the outbox: the
+ *  tag update and the notification sends are two separate, non-atomic steps,
+ *  and `notifier.sendNotificationEmail` publishes to the broker directly
+ *  (best-effort, no retry). A broker blip during a scan drops that
+ *  subscriber's notification with no redelivery — accepted for now since
+ *  the next scan still detects and reports future releases, and wiring
+ *  per-subscriber outbox rows here is deferred to the `release.detected`
+ *  event migration mentioned above. */
 export interface ReleaseHandler {
   handle(
     repo: string,

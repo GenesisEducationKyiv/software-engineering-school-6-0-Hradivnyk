@@ -17,6 +17,17 @@ const optionalInt = (key: string, defaultValue: number): number => {
   return parsed;
 };
 
+const positiveInt = (key: string, defaultValue: number): number => {
+  const raw = process.env[key];
+  const value = raw !== undefined ? Number.parseInt(raw, 10) : defaultValue;
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(
+      `Env variable ${key} must be a positive integer, got: ${raw ?? defaultValue}`,
+    );
+  }
+  return value;
+};
+
 const nodeEnv = optional('NODE_ENV', 'development');
 
 export const config = {
@@ -41,9 +52,8 @@ export const config = {
   github: {
     token: optional('GITHUB_TOKEN', ''),
   },
-  notification: {
-    url: optional('NOTIFICATION_SERVICE_URL', 'http://localhost:4000'),
-    timeoutMs: optionalInt('NOTIFICATION_TIMEOUT_MS', 5000),
+  rabbitmq: {
+    url: optional('RABBITMQ_URL', 'amqp://localhost:5672'),
   },
   app: {
     baseUrl: optional('BASE_URL', 'http://localhost:3000'),
@@ -51,6 +61,10 @@ export const config = {
   },
   scanner: {
     cronSchedule: optional('SCANNER_CRON_SCHEDULE', '0 * * * *'),
+  },
+  outbox: {
+    pollIntervalMs: positiveInt('OUTBOX_POLL_INTERVAL_MS', 1000),
+    batchSize: positiveInt('OUTBOX_BATCH_SIZE', 50),
   },
   auth: {
     apiKey: required('API_KEY'),

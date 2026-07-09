@@ -13,7 +13,7 @@ services:
       ALLOWED_ORIGIN: '*'
       API_KEY: test-api-key
       SCANNER_CRON_SCHEDULE: '0 * * * *'
-      NOTIFICATION_SERVICE_URL: http://notification:4000
+      RABBITMQ_URL: amqp://rabbitmq:5672
       # Point to the in-network mock instead of the real GitHub API so that
       # E2E tests exercise the full internal stack without an external dependency.
       GITHUB_API_URL: http://github-mock:3001
@@ -26,6 +26,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
       notification:
         condition: service_healthy
       github-mock:
@@ -37,7 +39,8 @@ services:
       dockerfile: services/notification/Dockerfile
     environment:
       NODE_ENV: production
-      NOTIFICATION_PORT: 4000
+      HEALTH_PORT: 3002
+      RABBITMQ_URL: amqp://rabbitmq:5672
       SMTP_HOST: mailhog
       SMTP_PORT: '1025'
       SMTP_USER: test@example.com
@@ -45,13 +48,16 @@ services:
       SMTP_FROM: noreply@test.example.com
       BASE_URL: http://localhost:3000
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://localhost:4000/health || exit 1']
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3002/ || exit 1']
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
     depends_on:
-      - mailhog
+      rabbitmq:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
 
   # Minimal GitHub API mock: returns HTTP 200 + JSON for any request,
   # which is enough for githubService.repositoryExists() to return true.
@@ -65,6 +71,14 @@ services:
           res.end(JSON.stringify({ id: 1 }));
         }).listen(3001, () => console.log('GitHub mock listening on :3001'));
       "
+
+  rabbitmq:
+    image: rabbitmq:3.13-alpine
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   mailhog:
     image: mailhog/mailhog:v1.0.1

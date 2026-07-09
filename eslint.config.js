@@ -24,7 +24,7 @@ export default tseslint.config(
       parserOptions: {
         // gives ESLint access to TypeScript types so that it can perform a deep analysis
         // of the code, rather than just a syntactic one
-        project: ['./tsconfig.json', './tsconfig.eslint.json'],
+        project: ['./tsconfig.eslint.json'],
         tsconfigRootDir: import.meta.dirname,
       },
       globals: { ...globals.node },
