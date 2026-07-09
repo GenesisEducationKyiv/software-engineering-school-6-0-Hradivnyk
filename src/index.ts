@@ -58,11 +58,14 @@ async function startApp(): Promise<void> {
     sagaSweeper.stop();
 
     server.close(() => {
-      clearTimeout(timer);
       broker
         .close()
-        .then(() => process.exit(code))
+        .then(() => {
+          clearTimeout(timer);
+          process.exit(code);
+        })
         .catch((err: unknown) => {
+          clearTimeout(timer);
           logger.error({ err }, 'Error closing broker during shutdown');
           process.exit(1);
         });

@@ -14,6 +14,14 @@ import type { IUnitOfWork } from './db/unit-of-work.js';
 
 const QUEUE = 'notification.email-requested';
 
+// Bounds the best-effort dedupe cache for fire-and-forget notification emails
+// (confirmation emails already get a persisted, cross-restart-safe dedupe via
+// the saga inbox keyed by saga_id — see handleConfirmation). The outbox
+// delivers at-least-once, so a redelivered event must not cause a second
+// email. This only covers duplicates seen within one process lifetime/cache
+// window, not across a restart.
+const SEEN_EVENT_CACHE_SIZE = 1000;
+
 /**
  * Consumes email.requested commands from the app service.
  *
@@ -24,12 +32,14 @@ const QUEUE = 'notification.email-requested';
  *   3b. Permanent failure: atomically mark inbox 'failed' + enqueue email.failed reply.
  *      The reply is ack-ed normally; the orchestrator in app handles the compensation.
  *
- * Release notification emails (fire-and-forget) are unchanged: a send failure
- * throws so the broker nacks and the message is dropped (no saga, no reply).
+ * Release notification emails (fire-and-forget) are deduped in-memory by
+ * event_id: a send failure throws so the broker nacks and the message is
+ * dropped (no saga, no reply).
  */
 export class EmailRequestedConsumer {
   private started = false;
   private stopping = false;
+  private readonly seenEventIds = new Map<string, true>();
 
   constructor(
     private readonly broker: IBroker,
@@ -46,16 +56,32 @@ export class EmailRequestedConsumer {
 
   async start(): Promise<void> {
     if (this.started) return;
-    await this.broker.subscribe(
-      QUEUE,
-      EMAIL_REQUESTED,
-      async (raw): Promise<void> => {
-        if (this.stopping) return;
-        const payload = EmailRequestedPayloadSchema.parse(raw);
+    this.started = true;
+    try {
+      await this.broker.subscribe(
+        QUEUE,
+        EMAIL_REQUESTED,
+        async (raw): Promise<void> => {
+          if (this.stopping) return;
+          const payload = EmailRequestedPayloadSchema.parse(raw);
 
-        if (payload.type === 'confirmation') {
-          await this.handleConfirmation(payload);
-        } else {
+          if (payload.type === 'confirmation') {
+            await this.handleConfirmation(payload);
+            return;
+          }
+
+          if (this.seenEventIds.has(payload.event_id)) {
+            this.logger.info(
+              {
+                event: 'email.duplicate_skipped',
+                eventId: payload.event_id,
+                repo: payload.repo,
+              },
+              'Duplicate email-requested event skipped',
+            );
+            return;
+          }
+
           // Release notification: fire-and-forget, no saga
           await this.notifier.sendNotificationEmail(
             payload.email,
@@ -67,10 +93,21 @@ export class EmailRequestedConsumer {
             { event: 'email.notification_sent', repo: payload.repo },
             'Notification email sent',
           );
-        }
-      },
-    );
-    this.started = true;
+          this.markSeen(payload.event_id);
+        },
+      );
+    } catch (err) {
+      this.started = false;
+      throw err;
+    }
+  }
+
+  private markSeen(eventId: string): void {
+    this.seenEventIds.set(eventId, true);
+    if (this.seenEventIds.size > SEEN_EVENT_CACHE_SIZE) {
+      const oldest = this.seenEventIds.keys().next().value;
+      if (oldest !== undefined) this.seenEventIds.delete(oldest);
+    }
   }
 
   private async handleConfirmation(

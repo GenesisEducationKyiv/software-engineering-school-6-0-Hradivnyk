@@ -84,7 +84,7 @@ describe('InProcessReleaseHandler', () => {
     );
   });
 
-  it('should not update last_seen_tag if any notification fails', async () => {
+  it('should update last_seen_tag even if some notifications fail', async () => {
     mockNotifier.sendNotificationEmail
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error('SMTP error'));
@@ -94,7 +94,27 @@ describe('InProcessReleaseHandler', () => {
       makeSubscriber('b@example.com'),
     ]);
 
-    expect(mockRepositoryModel.updateLastSeenTag).not.toHaveBeenCalled();
+    expect(mockRepositoryModel.updateLastSeenTag).toHaveBeenCalledWith(
+      REPO,
+      'v2.0.0',
+    );
+  });
+
+  it('should log an error for each failed notification without blocking others', async () => {
+    mockNotifier.sendNotificationEmail
+      .mockRejectedValueOnce(new Error('SMTP error'))
+      .mockResolvedValueOnce(undefined);
+
+    await handler.handle(REPO, RELEASE, [
+      makeSubscriber('a@example.com'),
+      makeSubscriber('b@example.com'),
+    ]);
+
+    expect(mockLogger.error).toHaveBeenCalledTimes(1);
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ repo: REPO }),
+      'ReleaseHandler: failed to send notification email',
+    );
   });
 
   it('should attempt delivery to all subscribers even if one fails', async () => {

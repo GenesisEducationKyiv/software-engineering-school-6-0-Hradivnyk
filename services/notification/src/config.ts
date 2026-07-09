@@ -16,6 +16,15 @@ const optionalInt = (key: string, defaultValue: number): number => {
   return parsed;
 };
 
+const optionalPositiveInt = (key: string, defaultValue: number): number => {
+  const value = optionalInt(key, defaultValue);
+  if (value < 1)
+    throw new Error(
+      `Env variable ${key} must be >= 1, got: ${value.toString()}`,
+    );
+  return value;
+};
+
 const nodeEnv = optional('NODE_ENV', 'development');
 
 // EMAIL_SENDER controls which IEmailSender implementation is used.
@@ -56,7 +65,7 @@ export const config = {
     baseUrl: optional('BASE_URL', 'http://localhost:3000'),
   },
   retry: {
-    attempts: optionalInt('EMAIL_RETRY_ATTEMPTS', 3),
+    attempts: optionalPositiveInt('EMAIL_RETRY_ATTEMPTS', 3),
     backoffMs: optionalInt('EMAIL_RETRY_BACKOFF_MS', 500),
   },
   rabbitmq: {

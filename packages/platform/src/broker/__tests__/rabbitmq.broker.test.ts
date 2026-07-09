@@ -8,6 +8,7 @@ jest.mock('amqplib', () => ({
 }));
 
 const EXCHANGE = 'release-owl.events';
+const DEAD_LETTER_EXCHANGE = 'release-owl.events.dlx';
 
 const noopLogger: ILogger = {
   info: () => undefined,
@@ -29,7 +30,15 @@ function makeChannel() {
       consumeCb = cb;
       return { consumerTag: 'tag' };
     }),
-    publish: jest.fn(),
+    publish: jest.fn(
+      (
+        _exchange: string,
+        _routingKey: string,
+        _content: Buffer,
+        _options: unknown,
+        cb: (err: Error | null) => void,
+      ) => cb(null),
+    ),
     ack: jest.fn(),
     nack: jest.fn(),
     close: jest.fn().mockResolvedValue(undefined),
@@ -41,7 +50,7 @@ function makeChannel() {
 
 function makeConnection(channel: ReturnType<typeof makeChannel>['channel']) {
   return {
-    createChannel: jest.fn().mockResolvedValue(channel),
+    createConfirmChannel: jest.fn().mockResolvedValue(channel),
     on: jest.fn(),
     close: jest.fn().mockResolvedValue(undefined),
   };
@@ -73,6 +82,38 @@ describe('RabbitMQBroker delivery cycle', () => {
     expect(handler).toHaveBeenCalledWith({ hello: 'world' });
     expect(channel.ack).toHaveBeenCalledTimes(1);
     expect(channel.nack).not.toHaveBeenCalled();
+  });
+
+  it('wires the queue to a dead-letter exchange and binds a per-queue DLQ', async () => {
+    const { channel } = makeChannel();
+    mockConnect.mockResolvedValue(makeConnection(channel));
+
+    const broker = new RabbitMQBroker('amqp://localhost', noopLogger);
+    await broker.connect();
+
+    const handler = jest.fn().mockResolvedValue(undefined);
+    await broker.subscribe('queue', 'rk', handler);
+
+    expect(channel.assertExchange).toHaveBeenCalledWith(
+      DEAD_LETTER_EXCHANGE,
+      'topic',
+      { durable: true },
+    );
+    expect(channel.assertQueue).toHaveBeenCalledWith('queue.dlq', {
+      durable: true,
+    });
+    expect(channel.bindQueue).toHaveBeenCalledWith(
+      'queue.dlq',
+      DEAD_LETTER_EXCHANGE,
+      'rk',
+    );
+    expect(channel.assertQueue).toHaveBeenCalledWith('queue', {
+      durable: true,
+      arguments: {
+        'x-dead-letter-exchange': DEAD_LETTER_EXCHANGE,
+        'x-dead-letter-routing-key': 'rk',
+      },
+    });
   });
 
   it('nacks without requeue when the handler throws', async () => {
@@ -139,8 +180,9 @@ describe('RabbitMQBroker delivery cycle', () => {
       'rk',
       expect.any(Buffer),
       { persistent: true },
+      expect.any(Function),
     );
-    const sentBody = channel.publish.mock.calls[0][2] as Buffer;
+    const sentBody = channel.publish.mock.calls[0][2];
     expect(JSON.parse(sentBody.toString())).toEqual({ a: 1 });
   });
 });
